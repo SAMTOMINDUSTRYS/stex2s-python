@@ -17,17 +17,22 @@ class Stock:
     symbol: str
     name: str
 
+@dataclass
 class Client:
-    pass
+    csid: str
+    name: str
+    balance: float = 0
+    holdings: Dict[str, int] = field(default_factory = dict)
 
 @dataclass
 class Trade:
     symbol: str
     buy_txid: str
-    sell_txids: List[str]
     avg_price: float
+    total_price: float
     volume: int
     closed: bool = False
+    sell_txids: List[str] = field(default_factory = List)
 
 @dataclass
 class Order:
@@ -288,15 +293,19 @@ class MarketStall:
             buy_txid=buy.txid,
             sell_txids=sell_txids,
             avg_price=tot_price/buy.volume,
+            total_price=tot_price,
             closed=True,
         )
 
         # Finally, if Sell volume exceeded requirement, split the final sell into a new Order
         if excess > 0:
+            last_sell = sells[-1]
+            last_sell.volume -= excess
+
             # new_sell.ts does not get updated
-            new_sell = copy.copy(sells[-1])
+            new_sell = copy.copy(last_sell)
             new_sell.closed = False
-            new_sell.volume -= excess
+            new_sell.volume = excess
 
             # Fiddle the txid so we know it is a split
             if '/' in new_sell.txid:
@@ -310,19 +319,40 @@ class MarketStall:
 
 
     def handle_order(self, msg):
-        self.add_order(msg)
+        buys = []
+        sells = []
 
+        # Assume the order goes through with no trouble
+        self.add_order(msg)
+        # and hackily add the order to the actions to be bubbled up to STEX
+        if msg.side == "BUY":
+            buys.append(msg)
+        elif msg.side == "SELL":
+            sells.append(msg)
+
+        return buys, sells
+
+
+    def handle_market(self):
         # Trigger match process
         # TODO Needs to be done somewhere else
         #       Will need to think about how this can be thread-safe if we move
         #       matching/trading to a separate thread from adding orders
         fulfilled_orders = self.orderbook.match_one()
 
+
         # If we have to return here to execute orders, we can only match once
+        buys = []
+        sells = []
+        trades = []
         for order in fulfilled_orders:
             trade = self.execute_trade(order["buy"], order["sells"], excess=order["excess"])
+            trades.append(trade)
             self.log_trade(trade)
             log.info(trade)
+
+            buys.append(order["buy"])
+            sells.extend(order["sells"])
 
         # some gross logging for now
         self.orderbook.balance_books()
@@ -335,11 +365,16 @@ class MarketStall:
             sell_str.append("%s#%d@%.3f" % (order.txid, order.volume, order.price))
         log.info(sell_str)
 
+        # Sneaky way of getting actions back up to the Exchange, we'll obviously
+        # want to do this async, and not in the order handler
+        return buys, sells, trades
+
 @dataclass
 class Exchange:
 
     txid_set: set = field(default_factory=set)
     stalls: Dict[str, MarketStall] = field(default_factory = dict)
+    users: Dict[str, Client] = field(default_factory = dict)
 
     def add_stocks(self, stocks: List[Stock]):
         for stock in stocks:
@@ -347,11 +382,67 @@ class Exchange:
 
     def add_stock(self, stock: Stock):
         self.stalls[stock.symbol] = MarketStall(stock=stock)
-        log.info("[bold red]INIT[/] Listed [b]%s[/] %s" % (stock.symbol, stock.name))
+        log.info("[bold red]MRKT[/] Listed [b]%s[/] %s" % (stock.symbol, stock.name))
+
+    def add_users(self, users: List[Client]):
+        for user in users:
+            self.add_user(user)
+
+    def add_user(self, user: Client):
+        self.users[user.csid] = user
+        log.info("[bold red]USER[/] Registered [b]%s[/] %s" % (user.csid, user.name))
+
+    def validate_preorder(self, user, order):
+        if order.side == "BUY":
+            if order.price * order.volume > user.balance:
+                raise Exception("Insufficient balance")
+        elif order.side == "SELL":
+            if order.symbol not in user.holdings:
+                raise Exception("Insufficient holding")
+            else:
+                if user.holdings[order.symbol] < order.volume:
+                    raise Exception("Insufficient holding")
+
+    def update_users(self, buy_orders, sell_orders, executed=False):
+        if not executed:
+            for order in buy_orders:
+                self.adjust_balance(order.csid, order.price * order.volume * -1)
+            for order in sell_orders:
+                self.adjust_holding(order.csid, order.symbol, order.volume * -1)
+        else:
+            for order in buy_orders:
+                self.adjust_holding(order.csid, order.symbol, order.volume)
+            for order in sell_orders:
+                # CRIT TODO Check this works with splits
+                self.adjust_balance(order.csid, order.price * order.volume)
+
+    def adjust_balance(self, csid, adjust_balance):
+        if csid not in self.users:
+            raise Exception("Unknown user")
+
+        user = self.users[csid]
+        user.balance += adjust_balance
+
+        log.info("[bold magenta]USER[/] [b]CASH[/] %s=%.3f" % (csid, user.balance))
+
+    def adjust_holding(self, csid, symbol, adjust_qty):
+        if csid not in self.users:
+            raise Exception("Unknown user")
+        if symbol not in self.stalls:
+            raise Exception("Unknown symbol")
+
+        user = self.users[csid]
+        if symbol not in user.holdings:
+            user.holdings[symbol] = 0
+        user.holdings[symbol] += adjust_qty
+
+        log.info("[bold magenta]USER[/] [b]HOLD[/] %s:%s=%.3f" % (csid, symbol, user.holdings[symbol]))
 
     def recv(self, msg):
         if msg["txid"] in self.txid_set:
             raise Exception("Duplicate transaction")
+        if msg["csid"] not in self.users:
+            raise Exception("Unknown user")
 
         order = Order(
             txid=msg["txid"],
@@ -365,7 +456,22 @@ class Exchange:
         if order.symbol not in self.stalls:
             raise Exception("Unknown symbol")
 
-        self.stalls[order.symbol].handle_order(order)
+        try:
+            # Good transaction isolation is going to be needed to ensure balance
+            # and holdings stay positive in the event of concurrent order handlers
+            self.validate_preorder(self.users[order.csid], order)
+        except Exception as e:
+            raise e
+
+        # Bit of a cheat to return this stuff here but let's keep it simple
+        buys, sells = self.stalls[order.symbol].handle_order(order)
+        self.update_users(buys, sells)
+
+        # Need to handle the market tick async from messages but this will do for now
+        buys, sells, trades = self.stalls[order.symbol].handle_market()
+        self.update_users(buys, sells, executed=True)
+
+        # Idempotent txid
         self.txid_set.add(msg["txid"])
 
 if __name__ == "__main__":
@@ -376,6 +482,15 @@ if __name__ == "__main__":
         Stock(symbol="ELAN", name="Elan Dataworks"),
     ]
     stex.add_stocks(stocks)
+
+    clients = [
+        Client(csid="1", name="Sam"),
+    ]
+    stex.add_users(clients)
+    stex.adjust_balance(csid="1", adjust_balance=+100000)
+    stex.adjust_holding(csid="1", symbol="STI.", adjust_qty=+10000)
+    stex.adjust_holding(csid="1", symbol="ELAN", adjust_qty=+10000)
+
     stex.recv({
         "txid": "1",
         "csid": "1",
