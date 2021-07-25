@@ -40,19 +40,11 @@ class AbstractUoW(abc.ABC):
 
 ###############################################################################
 
-class AbstractClientRepository(AbstractRepository):
-    pass
-
-class AbstractClientUoW(AbstractUoW):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        self.users = AbstractClientRepository()
-
-class MemoryClientRepository(AbstractClientRepository):
+class MemoryRepository(AbstractRepository):
 
     # Class variable allows us to mock a crap memory DB
     # as values will persist across instances of MemoryClientRepository
-    _users = {}
+    _objects = {}
 
     # Keep tabs on object version checked out by `get` and ensure it is matched
     # when committing as a means to detect concurrent commits, effectively provides
@@ -60,44 +52,47 @@ class MemoryClientRepository(AbstractClientRepository):
     _versions = {}
 
     def __init__(self, *args, **kwargs):
-        self._staged_users = {}
+        self._staged_objects = {}
         self._staged_versions = {}
 
     def add(self, user: model.Client):
-        self._staged_users[user.csid] = user
+        self._staged_objects[user.csid] = user
 
-    def get(self, csid: str):
+    def get(self, obj_id: str):
         # Providing read committed isolation as only committed data can be
-        # read from _users and _staged_users cannot be read by other UoW
+        # read from _objects and _staged_objects cannot be read by other UoW
         # Does not guard against read skew and the like...
-        self._staged_users[csid] = copy.deepcopy(self._users.get(csid))
-        self._staged_versions[csid] = self._versions[csid]
-        return self._staged_users[csid]
+        self._staged_objects[obj_id] = copy.deepcopy(self._objects.get(obj_id))
+        self._staged_versions[obj_id] = self._versions[obj_id]
+        return self._staged_objects[obj_id]
 
     def commit(self):
-        for csid, user in self._staged_users.items():
-            if not self._users.get(csid):
-                log.info("[bold red]USER[/] Registered [b]%s[/] %s" % (user.csid, user.name))
-                self._versions[csid] = 0
+        for obj_id, obj in self._staged_objects.items():
+            if not self._objects.get(obj_id):
+                self._versions[obj_id] = 0
             else:
-                if self._versions[csid] != self._staged_versions[csid]:
+                if self._versions[obj_id] != self._staged_versions[obj_id]:
                     raise Exception("Concurrent commit rejected")
-            self._users[csid] = user
-            self._versions[csid] += 1
+            self._objects[obj_id] = obj
+            self._versions[obj_id] += 1
 
 
 class MemoryClientUoW(AbstractUoW):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.users = MemoryClientRepository()
+        self.users = MemoryRepository()
 
     def commit(self):
         self.users.commit()
+        for user_id, user in self.users._staged_objects.items():
+            if self.users._versions[user_id] == 1:
+                log.info("[bold red]USER[/] Registered [b]%s[/] %s" % (user.csid, user.name))
         self.committed = True
 
     def rollback(self):
         pass
+
 
 ###############################################################################
 
