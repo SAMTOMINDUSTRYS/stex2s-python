@@ -18,12 +18,11 @@ class Exchange:
         self.stalls = {} # Dict[str, model.MarketStall] = field(default_factory = dict)
 
     def add_stocks(self, stocks: List[model.Stock]):
-        for stock in stocks:
-            self.add_stock(stock)
-
-    def add_stock(self, stock: model.Stock):
-        self.stalls[stock.symbol] = model.MarketStall(stock=stock)
-        log.info("[bold red]MRKT[/] Listed [b]%s[/] %s" % (stock.symbol, stock.name))
+        with persistence.MemoryStockUoW() as uow:
+            for stock in stocks:
+                uow.stocks.add(stock)
+                uow.commit()
+                self.stalls[stock.symbol] = model.MarketStall(stock=stock)
 
     def add_users(self, clients: List[model.Client]):
         with persistence.MemoryClientUoW() as uow:
@@ -64,8 +63,11 @@ class Exchange:
         log.info("[bold magenta]USER[/] [b]CASH[/] %s=%.3f" % (csid, user.balance))
 
     def adjust_holding(self, csid, symbol, adjust_qty):
-        if symbol not in self.stalls:
+        with persistence.MemoryStockUoW() as uow:
+            stock = uow.stocks.get(symbol)
+        if not stock:
             raise Exception("Unknown symbol")
+
         with persistence.MemoryClientUoW() as uow:
             user = uow.users.get(csid)
             if symbol not in user.holdings:
@@ -92,7 +94,9 @@ class Exchange:
             volume=msg["volume"],
             ts=int(time.time()),
         )
-        if order.symbol not in self.stalls:
+        with persistence.MemoryStockUoW() as uow:
+            stock = uow.stocks.get(order.symbol)
+        if not stock:
             raise Exception("Unknown symbol")
 
         try:

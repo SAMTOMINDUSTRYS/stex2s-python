@@ -52,14 +52,25 @@ class MemoryRepository(AbstractRepository):
     # compare-and-set (could still be caught in a race condition)
     _versions = {}
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, prefix, *args, **kwargs):
+        # Prefix will avoid clashes between _objects with the same IDs across
+        # different namespaces. ie. Everything using the MemoryRepository is
+        # using the same _objects dictionary. This will not be particularly
+        # pretty but will work for now!
+        self.prefix = prefix
         self._staged_objects = {}
         self._staged_versions = {}
 
+    def get_obj_id(self, obj_id):
+        return "%s-%s" % (self.prefix, obj_id)
+
     def add(self, obj):
-        self._staged_objects[obj.stexid] = obj
+        obj_id = self.get_obj_id(obj.stexid)
+        self._staged_objects[obj_id] = obj
 
     def get(self, obj_id: str):
+        obj_id = self.get_obj_id(obj_id)
+
         # Providing read committed isolation as only committed data can be
         # read from _objects and _staged_objects cannot be read by other UoW
         # Does not guard against read skew and the like...
@@ -77,19 +88,37 @@ class MemoryRepository(AbstractRepository):
             self._objects[obj_id] = obj
             self._versions[obj_id] += 1
 
+        # Reset staged objects?
+        # CRIT TODO Could break commit - edit - commit workflow
+        self._staged_objects = {}
 
 
 class MemoryClientUoW(AbstractUoW):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.users = MemoryRepository()
+        self.users = MemoryRepository(prefix="clients")
 
     def commit(self):
         self.users.commit()
         for user_id, user in self.users._staged_objects.items():
             if self.users._versions[user_id] == 1:
                 log.info("[bold red]USER[/] Registered [b]%s[/] %s" % (user.csid, user.name))
+        self.committed = True
+
+    def rollback(self):
+        pass
+
+
+class MemoryStockUoW(AbstractUoW):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.stocks = MemoryRepository(prefix="stocks", stexid="symbol")
+
+    def commit(self):
+        self.stocks.commit()
+        for symbol, stock in self.stocks._staged_objects.items():
+            if self.stocks._versions[symbol] == 1:
+                log.info("[bold red]MRKT[/] Listed [b]%s[/] %s" % (stock.symbol, stock.name))
         self.committed = True
 
     def rollback(self):
