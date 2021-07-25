@@ -1,16 +1,9 @@
 from dataclasses import dataclass, field
 from typing import List, Dict
-import logging
 import time
 import copy
 
-# https://rich.readthedocs.io/en/stable/logging.html
-from rich.logging import RichHandler
-log = logging.getLogger("rich")
-FORMAT = "%(message)s"
-logging.basicConfig(
-    level="NOTSET", format=FORMAT, datefmt="[%X]", handlers=[RichHandler(markup=True)]
-)
+from stexs.services.logger import log
 
 @dataclass
 class Stock:
@@ -384,13 +377,8 @@ class Exchange:
         self.stalls[stock.symbol] = MarketStall(stock=stock)
         log.info("[bold red]MRKT[/] Listed [b]%s[/] %s" % (stock.symbol, stock.name))
 
-    def add_users(self, users: List[Client]):
-        for user in users:
-            self.add_user(user)
-
-    def add_user(self, user: Client):
-        self.users[user.csid] = user
-        log.info("[bold red]USER[/] Registered [b]%s[/] %s" % (user.csid, user.name))
+    def set_users(self, users: List[Client]):
+        self.users = users
 
     def validate_preorder(self, user, order):
         if order.side == "BUY":

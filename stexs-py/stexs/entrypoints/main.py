@@ -1,5 +1,5 @@
 from stexs.domain import model
-
+from stexs.io import persistence
 
 if __name__ == "__main__":
     stex = model.Exchange()
@@ -13,10 +13,15 @@ if __name__ == "__main__":
     clients = [
         model.Client(csid="1", name="Sam"),
     ]
-    stex.add_users(clients)
+    with persistence.MemoryClientUoW() as uow:
+        for client in clients:
+            uow.users.add(client)
+        uow.commit()
+    stex.set_users(uow.users._users)
     stex.adjust_balance(csid="1", adjust_balance=+100000)
     stex.adjust_holding(csid="1", symbol="STI.", adjust_qty=+10000)
     stex.adjust_holding(csid="1", symbol="ELAN", adjust_qty=+10000)
+
 
     stex.recv({
         "txid": "1",
