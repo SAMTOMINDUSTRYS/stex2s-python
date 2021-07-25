@@ -41,6 +41,7 @@ class AbstractUoW(abc.ABC):
 ###############################################################################
 
 class MemoryRepository(AbstractRepository):
+    # TODO This seems to act more like a UoW than the UoW does !
 
     # Class variable allows us to mock a crap memory DB
     # as values will persist across instances of MemoryClientRepository
@@ -55,8 +56,8 @@ class MemoryRepository(AbstractRepository):
         self._staged_objects = {}
         self._staged_versions = {}
 
-    def add(self, user: model.Client):
-        self._staged_objects[user.csid] = user
+    def add(self, obj):
+        self._staged_objects[obj.stexid] = obj
 
     def get(self, obj_id: str):
         # Providing read committed isolation as only committed data can be
@@ -75,6 +76,7 @@ class MemoryRepository(AbstractRepository):
                     raise Exception("Concurrent commit rejected")
             self._objects[obj_id] = obj
             self._versions[obj_id] += 1
+
 
 
 class MemoryClientUoW(AbstractUoW):

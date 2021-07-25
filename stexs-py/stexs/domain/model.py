@@ -12,6 +12,7 @@ class Stock:
 
 @dataclass
 class Client:
+    stexid: str
     csid: str
     name: str
     balance: float = 0

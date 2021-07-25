@@ -11,7 +11,7 @@ if __name__ == "__main__":
     stex.add_stocks(stocks)
 
     clients = [
-        model.Client(csid="1", name="Sam"),
+        model.Client(stexid="1", csid="1", name="Sam"),
     ]
     stex.add_users(clients)
     stex.adjust_balance(csid="1", adjust_balance=+100000)
