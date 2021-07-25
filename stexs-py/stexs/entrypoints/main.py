@@ -1,8 +1,8 @@
 from stexs.domain import model
-from stexs.io import persistence
+from stexs.services.exchange import Exchange
 
 if __name__ == "__main__":
-    stex = model.Exchange()
+    stex = Exchange()
     stocks = [
         model.Stock(symbol="STI.", name="Sam and Tom Industrys"),
         model.Stock(symbol="ARRM", name="AbeRystwyth RISC Machines"),
@@ -13,11 +13,7 @@ if __name__ == "__main__":
     clients = [
         model.Client(csid="1", name="Sam"),
     ]
-    with persistence.MemoryClientUoW() as uow:
-        for client in clients:
-            uow.users.add(client)
-        uow.commit()
-    stex.set_users(uow.users._users)
+    stex.add_users(clients)
     stex.adjust_balance(csid="1", adjust_balance=+100000)
     stex.adjust_holding(csid="1", symbol="STI.", adjust_qty=+10000)
     stex.adjust_holding(csid="1", symbol="ELAN", adjust_qty=+10000)

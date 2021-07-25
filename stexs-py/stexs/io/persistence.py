@@ -60,12 +60,15 @@ class MemoryClientRepository(AbstractClientRepository):
         self._staged_users[user.csid] = user
 
     def get(self, csid: str):
-        return self._users.get(user.csid)
+        self._staged_users[csid] = self._users.get(csid)
+        return self._staged_users[csid]
 
     def commit(self):
         for csid, user in self._staged_users.items():
+            if not self._users.get(csid):
+                log.info("[bold red]USER[/] Registered [b]%s[/] %s" % (user.csid, user.name))
             self._users[csid] = user
-            log.info("[bold red]USER[/] Registered [b]%s[/] %s" % (user.csid, user.name))
+
 
 class MemoryClientUoW(AbstractUoW):
 
