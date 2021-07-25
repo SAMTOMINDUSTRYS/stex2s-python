@@ -3,6 +3,7 @@
 
 import abc
 from stexs.domain import model
+import copy
 
 from stexs.services.logger import log
 
@@ -53,21 +54,36 @@ class MemoryClientRepository(AbstractClientRepository):
     # as values will persist across instances of MemoryClientRepository
     _users = {}
 
+    # Keep tabs on object version checked out by `get` and ensure it is matched
+    # when committing as a means to detect concurrent commits, effectively provides
+    # compare-and-set (could still be caught in a race condition)
+    _versions = {}
+
     def __init__(self, *args, **kwargs):
         self._staged_users = {}
+        self._staged_versions = {}
 
     def add(self, user: model.Client):
         self._staged_users[user.csid] = user
 
     def get(self, csid: str):
-        self._staged_users[csid] = self._users.get(csid)
+        # Providing read committed isolation as only committed data can be
+        # read from _users and _staged_users cannot be read by other UoW
+        # Does not guard against read skew and the like...
+        self._staged_users[csid] = copy.deepcopy(self._users.get(csid))
+        self._staged_versions[csid] = self._versions[csid]
         return self._staged_users[csid]
 
     def commit(self):
         for csid, user in self._staged_users.items():
             if not self._users.get(csid):
                 log.info("[bold red]USER[/] Registered [b]%s[/] %s" % (user.csid, user.name))
+                self._versions[csid] = 0
+            else:
+                if self._versions[csid] != self._staged_versions[csid]:
+                    raise Exception("Concurrent commit rejected")
             self._users[csid] = user
+            self._versions[csid] += 1
 
 
 class MemoryClientUoW(AbstractUoW):

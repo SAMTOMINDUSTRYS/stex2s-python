@@ -56,8 +56,8 @@ class Exchange:
                 self.adjust_balance(order.csid, order.price * order.volume)
 
     def adjust_balance(self, csid, adjust_balance):
-        user = get_user(csid)
         with persistence.MemoryClientUoW() as uow:
+            user = uow.users.get(csid)
             user.balance += adjust_balance
             uow.commit()
 
@@ -66,8 +66,8 @@ class Exchange:
     def adjust_holding(self, csid, symbol, adjust_qty):
         if symbol not in self.stalls:
             raise Exception("Unknown symbol")
-        user = get_user(csid)
         with persistence.MemoryClientUoW() as uow:
+            user = uow.users.get(csid)
             if symbol not in user.holdings:
                 user.holdings[symbol] = 0
             user.holdings[symbol] += adjust_qty
