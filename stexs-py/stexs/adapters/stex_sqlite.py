@@ -35,7 +35,5 @@ stocks = Table(
 )
 
 # Map Table to dataclass
-# Cosmic Python recommends you implement a start_mappers function to turn these on and off
-# I haven't done this as I am yet to work out why it matters...
 stocks_mapper = mapper_registry.map_imperatively(model.Stock, stocks)
 
