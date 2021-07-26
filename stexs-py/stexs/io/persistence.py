@@ -40,7 +40,7 @@ class AbstractUoW(abc.ABC):
 
 ###############################################################################
 
-class MemoryRepository(AbstractRepository):
+class GenericMemoryRepository(AbstractRepository):
     # TODO This seems to act more like a UoW than the UoW does !
 
     # Class variable allows us to mock a crap memory DB
@@ -54,7 +54,7 @@ class MemoryRepository(AbstractRepository):
 
     def __init__(self, prefix, *args, **kwargs):
         # Prefix will avoid clashes between _objects with the same IDs across
-        # different namespaces. ie. Everything using the MemoryRepository is
+        # different namespaces. ie. Everything using the GenericMemoryRepository is
         # using the same _objects dictionary. This will not be particularly
         # pretty but will work for now!
         self.prefix = prefix
@@ -96,7 +96,7 @@ class MemoryRepository(AbstractRepository):
 class MemoryClientUoW(AbstractUoW):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.users = MemoryRepository(prefix="clients")
+        self.users = GenericMemoryRepository(prefix="clients")
 
     def commit(self):
         self.users.commit()
@@ -112,7 +112,7 @@ class MemoryClientUoW(AbstractUoW):
 class MemoryStockUoW(AbstractUoW):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.stocks = MemoryRepository(prefix="stocks", stexid="symbol")
+        self.stocks = GenericMemoryRepository(prefix="stocks", stexid="symbol")
 
     def commit(self):
         self.stocks.commit()
