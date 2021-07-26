@@ -18,7 +18,7 @@ class Exchange:
         self.stalls = {} # Dict[str, model.MarketStall] = field(default_factory = dict)
 
     def add_stocks(self, stocks: List[model.Stock]):
-        with persistence.MemoryStockUoW() as uow:
+        with persistence.StockSqliteUoW() as uow:
             for stock in stocks:
                 uow.stocks.add(stock)
                 uow.commit()
@@ -63,7 +63,7 @@ class Exchange:
         log.info("[bold magenta]USER[/] [b]CASH[/] %s=%.3f" % (csid, user.balance))
 
     def adjust_holding(self, csid, symbol, adjust_qty):
-        with persistence.MemoryStockUoW() as uow:
+        with persistence.StockSqliteUoW() as uow:
             stock = uow.stocks.get(symbol)
         if not stock:
             raise Exception("Unknown symbol")
@@ -94,7 +94,7 @@ class Exchange:
             volume=msg["volume"],
             ts=int(time.time()),
         )
-        with persistence.MemoryStockUoW() as uow:
+        with persistence.StockSqliteUoW() as uow:
             stock = uow.stocks.get(order.symbol)
         if not stock:
             raise Exception("Unknown symbol")

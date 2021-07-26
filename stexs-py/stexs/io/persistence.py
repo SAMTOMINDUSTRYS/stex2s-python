@@ -127,3 +127,53 @@ class MemoryStockUoW(AbstractUoW):
 
 ###############################################################################
 
+from sqlalchemy.exc import NoResultFound # Could wrap this?
+from stexs.adapters.stex_sqlite import StexSqliteSessionFactory
+
+class GenericSqliteRepository(AbstractRepository):
+
+    def __init__(self, session, *args, **kwargs):
+        self.session = session
+
+    def add(self, obj):
+        self.session.add(obj)
+
+    @abc.abstractmethod
+    def _get(self, obj_id: str):
+        pass
+
+    def get(self, obj_id: str):
+        try:
+            return self._get(obj_id)
+        except NoResultFound:
+            return None
+
+    def commit(self):
+        self.session.commit()
+
+    def rollback(self):
+        self.session.rollback()
+
+class StockSqliteRepository(GenericSqliteRepository):
+    def _get(self, stock_symbol):
+            return self.session.query(model.Stock).filter_by(symbol=stock_symbol).one()
+
+
+class StockSqliteUoW(AbstractUoW):
+
+    def __enter__(self, session_factory=StexSqliteSessionFactory):
+        self.session = session_factory.get_session()
+        self.stocks = StockSqliteRepository(self.session)
+        return super().__enter__()
+
+    def __exit__(self, *args):
+        super().__exit__(*args)
+        self.session.close()
+
+    def commit(self):
+        self.stocks.commit()
+
+    def rollback(self):
+        self.stocks.rollback()
+
+###############################################################################
