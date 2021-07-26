@@ -64,9 +64,11 @@ class Exchange:
 
     def adjust_holding(self, csid, symbol, adjust_qty):
         with persistence.StockSqliteUoW() as uow:
+            # Try out cached list
+            stock_list = uow.stocks.list()
+            if not symbol in stock_list:
+                raise Exception("Unknown symbol")
             stock = uow.stocks.get(symbol)
-        if not stock:
-            raise Exception("Unknown symbol")
 
         with persistence.MemoryClientUoW() as uow:
             user = uow.users.get(csid)

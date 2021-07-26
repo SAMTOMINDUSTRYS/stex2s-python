@@ -4,6 +4,7 @@
 import abc
 from stexs.domain import model
 import copy
+import time
 
 from stexs.services.logger import log
 
@@ -42,6 +43,8 @@ class AbstractUoW(abc.ABC):
 
 class GenericMemoryRepository(AbstractRepository):
     # TODO This seems to act more like a UoW than the UoW does !
+    # CRIT TODO The refs to self._object only happen to work as the struct id is shared
+    #           but should use GenericMemoryRepository._objects to prevent shadowing
 
     # Class variable allows us to mock a crap memory DB
     # as values will persist across instances of MemoryClientRepository
@@ -140,7 +143,7 @@ class GenericSqliteRepository(AbstractRepository):
 
     @abc.abstractmethod
     def _get(self, obj_id: str):
-        pass
+        raise NotImplementedError
 
     def get(self, obj_id: str):
         try:
@@ -151,8 +154,23 @@ class GenericSqliteRepository(AbstractRepository):
 
 class StockSqliteRepository(GenericSqliteRepository):
 
+    _stock_cache = []
+    _stock_stamp = None
+
     def _get(self, stock_symbol):
-            return self.session.query(model.Stock).filter_by(symbol=stock_symbol).one()
+        return self.session.query(model.Stock).filter_by(symbol=stock_symbol).one()
+
+    # TODO Should come from an abc for Stock
+    def list(self):
+        # TODO Probably better to do this with a decorator or the like but still,
+        # interesting to see that we can quickly add this sort of stuff from the Repo!
+        log.critical(StockSqliteRepository._stock_stamp)
+        if not StockSqliteRepository._stock_stamp or (int(time.time()) - StockSqliteRepository._stock_stamp) > 60:
+            StockSqliteRepository._stock_cache = [x[0] for x in self.session.query(model.Stock).with_entities(model.Stock.symbol).all()]
+            StockSqliteRepository._stock_stamp = int(time.time())
+            log.debug("Refreshing Stock cache")
+        log.critical(StockSqliteRepository._stock_cache)
+        return StockSqliteRepository._stock_cache
 
 
 class StockSqliteUoW(AbstractUoW):
