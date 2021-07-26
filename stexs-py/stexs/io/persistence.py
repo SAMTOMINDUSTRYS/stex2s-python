@@ -78,7 +78,7 @@ class GenericMemoryRepository(AbstractRepository):
         self._staged_versions[obj_id] = self._versions[obj_id]
         return self._staged_objects[obj_id]
 
-    def commit(self):
+    def _commit(self):
         for obj_id, obj in self._staged_objects.items():
             if not self._objects.get(obj_id):
                 self._versions[obj_id] = 0
@@ -99,7 +99,7 @@ class MemoryClientUoW(AbstractUoW):
         self.users = GenericMemoryRepository(prefix="clients")
 
     def commit(self):
-        self.users.commit()
+        self.users._commit()
         for user_id, user in self.users._staged_objects.items():
             if self.users._versions[user_id] == 1:
                 log.info("[bold red]USER[/] Registered [b]%s[/] %s" % (user.csid, user.name))
@@ -115,7 +115,7 @@ class MemoryStockUoW(AbstractUoW):
         self.stocks = GenericMemoryRepository(prefix="stocks", stexid="symbol")
 
     def commit(self):
-        self.stocks.commit()
+        self.stocks._commit()
         for symbol, stock in self.stocks._staged_objects.items():
             if self.stocks._versions[symbol] == 1:
                 log.info("[bold red]MRKT[/] Listed [b]%s[/] %s" % (stock.symbol, stock.name))
@@ -148,13 +148,9 @@ class GenericSqliteRepository(AbstractRepository):
         except NoResultFound:
             return None
 
-    def commit(self):
-        self.session.commit()
-
-    def rollback(self):
-        self.session.rollback()
 
 class StockSqliteRepository(GenericSqliteRepository):
+
     def _get(self, stock_symbol):
             return self.session.query(model.Stock).filter_by(symbol=stock_symbol).one()
 
@@ -171,9 +167,9 @@ class StockSqliteUoW(AbstractUoW):
         self.session.close()
 
     def commit(self):
-        self.stocks.commit()
+        self.session.commit()
 
     def rollback(self):
-        self.stocks.rollback()
+        self.session.rollback()
 
 ###############################################################################
