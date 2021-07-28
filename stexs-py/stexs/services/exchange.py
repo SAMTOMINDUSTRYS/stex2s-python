@@ -1,5 +1,6 @@
 from stexs.domain import model
 from stexs.services.logger import log
+from stexs.services import orderbook
 import stexs.io.persistence as iop
 from typing import List, Dict
 import time
@@ -110,11 +111,13 @@ class Exchange:
             raise e
 
         # Bit of a cheat to return this stuff here but let's keep it simple
-        buys, sells = self.stalls[order.symbol].handle_order(order)
+        buys, sells = orderbook.handle_order(order.symbol, order)
         self.update_users(buys, sells)
 
         # Need to handle the market tick async from messages but this will do for now
-        buys, sells, trades = self.stalls[order.symbol].handle_market()
+        buys, sells, trades = orderbook.handle_market(order.symbol)
+        for trade in trades:
+            self.stalls[order.symbol].log_trade(trade)
         self.update_users(buys, sells, executed=True)
 
         # Idempotent txid
