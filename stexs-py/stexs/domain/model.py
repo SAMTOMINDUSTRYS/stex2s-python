@@ -46,6 +46,10 @@ class Order:
     volume: int
     closed: bool = False
 
+    @property
+    def stexid(self):
+        return self.txid
+
 @dataclass
 class OrderBook:
     stock: Stock # does this make sense?
