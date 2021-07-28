@@ -66,8 +66,8 @@ def match_one(symbol, uow):
                 if buy_filled:
                     #self.trade(buy=buy, sells=buy_sells, excess=curr_volume-buy_volume)
                     new_orders.append({
-                        "buy": buy,
-                        "sells": buy_sells,
+                        "buy": buy.txid,
+                        "sells": [sell.txid for sell in buy_sells],
                         "excess": curr_volume - buy_volume,
                     })
                     done = True # Force update before running match again
@@ -81,26 +81,32 @@ def match_one(symbol, uow):
 
         if done:
             break
+
     return new_orders
 
 
 def execute_trade(buy, sells, excess=0):
-
-    # Close buy and sells
-    buy.closed = True
-    for sell in sells:
-        sell.closed = True
+    with ORDER_UOW() as uow:
+        # Close buy and sells
+        buy = uow.orders.get(buy)
+        buy.closed = True
+        for sell in sells:
+            sell = uow.orders.get(sell)
+            sell.closed = True
+        uow.commit()
 
     # Price
-    tot_price = 0
-    sell_txids = []
-    for i_sell, sell in enumerate(sells):
-        sell_txids.append(sell.txid)
+    with ORDER_UOW() as uow:
+        tot_price = 0
+        sell_txids = []
+        for i_sell, sell in enumerate(sells):
+            sell = uow.orders.get(sell)
+            sell_txids.append(sell.txid)
 
-        if i_sell == len(sells)-1:
-            tot_price += (sell.price * (sell.volume - excess))
-        else:
-            tot_price += (sell.price * sell.volume)
+            if i_sell == len(sells)-1:
+                tot_price += (sell.price * (sell.volume - excess))
+            else:
+                tot_price += (sell.price * sell.volume)
 
     # Record Trade
     trade = model.Trade(
@@ -115,22 +121,23 @@ def execute_trade(buy, sells, excess=0):
 
     # Finally, if Sell volume exceeded requirement, split the final sell into a new Order
     if excess > 0:
-        last_sell = sells[-1]
-        last_sell.volume -= excess
-
-        # new_sell.ts does not get updated
-        new_sell = copy.copy(last_sell)
-        new_sell.closed = False
-        new_sell.volume = excess
-
-        # Fiddle the txid so we know it is a split
-        if '/' in new_sell.txid:
-            split_num = int(new_sell.txid.split('/')[1])+1
-        else:
-            split_num = 1
-        new_sell.txid += '/%d' % split_num
-
         with ORDER_UOW() as uow:
+
+            last_sell = uow.orders.get(sells[-1])
+            last_sell.volume -= excess
+
+            # new_sell.ts does not get updated
+            new_sell = copy.copy(last_sell)
+            new_sell.closed = False
+            new_sell.volume = excess
+
+            # Fiddle the txid so we know it is a split
+            if '/' in new_sell.txid:
+                split_num = int(new_sell.txid.split('/')[1])+1
+            else:
+                split_num = 1
+            new_sell.txid += '/%d' % split_num
+
             uow.orders.add(new_sell)
             uow.commit()
             #self.orderbook.add_order(new_sell)
@@ -215,13 +222,15 @@ def handle_market(symbol):
     buys = []
     sells = []
     trades = []
-    for order in fulfilled_orders:
-        trade = execute_trade(order["buy"], order["sells"], excess=order["excess"])
-        trades.append(trade)
-        log.info(trade)
+    with ORDER_UOW() as uow:
+        for order in fulfilled_orders:
+            trade = execute_trade(order["buy"], order["sells"], excess=order["excess"])
+            trades.append(trade)
+            log.info(trade)
 
-        buys.append(order["buy"])
-        sells.extend(order["sells"])
+            buys.append(uow.orders.get(order["buy"]))
+            for sell in order["sells"]:
+                sells.append(uow.orders.get(sell))
 
     with ORDER_UOW() as uow:
         buy_book = uow.orders.get_buy_book_for_symbol(symbol)

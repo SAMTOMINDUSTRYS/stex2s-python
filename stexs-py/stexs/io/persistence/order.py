@@ -1,3 +1,4 @@
+import copy
 from stexs.io.persistence.base import AbstractUoW, AbstractRepository
 from stexs.domain import model
 from stexs.services.logger import log
@@ -37,14 +38,20 @@ class OrderMemoryRepository(AbstractRepository):
         book = sorted(book, key=lambda order: (order.price, order.ts, order.txid))
         return book
 
-    def get(self, obj_id: str):
+    def get(self, txid: str):
+        #CRIT TODO bad
+        for symbol in self._objects:
+            for order in self._objects[symbol]:
+                if txid == order.txid:
+                    return copy.deepcopy(order)
+        return None
 
         # Providing read committed isolation as only committed data can be
         # read from _objects and _staged_objects cannot be read by other UoW
         # Does not guard against read skew and the like...
-        self._staged_objects[obj_id] = copy.deepcopy(self._objects.get(obj_id))
-        self._staged_versions[obj_id] = self._versions[obj_id]
-        return self._staged_objects[obj_id]
+        #self._staged_objects[obj_id] = copy.deepcopy(self._objects.get(obj_id))
+        #self._staged_versions[obj_id] = self._versions[obj_id]
+        #return self._staged_objects[obj_id]
 
     def _commit(self):
         for symbol in self._staged_objects:
