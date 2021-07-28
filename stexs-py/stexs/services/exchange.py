@@ -4,28 +4,25 @@ from stexs.io import persistence
 from typing import List, Dict
 import time
 
-def get_user(csid):
-    with persistence.MemoryClientUoW() as uow:
-        user = uow.users.get(csid)
-        if not user:
-            raise Exception("Unknown user")
-    return user
-
 class Exchange:
 
     def __init__(self, *args, **kwargs):
         self.txid_set = set([]) # set = field(default_factory=set)
         self.stalls = {} # Dict[str, model.MarketStall] = field(default_factory = dict)
 
+        # TODO Little hack for now
+        self.stock_uow = persistence.StockSqliteUoW
+        self.user_uow = persistence.MemoryClientUoW
+
     def add_stocks(self, stocks: List[model.Stock]):
-        with persistence.StockSqliteUoW() as uow:
+        with self.stock_uow() as uow:
             for stock in stocks:
                 uow.stocks.add(stock)
                 uow.commit()
                 self.stalls[stock.symbol] = model.MarketStall(stock=stock)
 
     def add_users(self, clients: List[model.Client]):
-        with persistence.MemoryClientUoW() as uow:
+        with self.user_uow() as uow:
             for client in clients:
                 uow.users.add(client)
             uow.commit()
@@ -55,7 +52,7 @@ class Exchange:
                 self.adjust_balance(order.csid, order.price * order.volume)
 
     def adjust_balance(self, csid, adjust_balance):
-        with persistence.MemoryClientUoW() as uow:
+        with self.user_uow() as uow:
             user = uow.users.get(csid)
             user.balance += adjust_balance
             uow.commit()
@@ -63,14 +60,14 @@ class Exchange:
         log.info("[bold magenta]USER[/] [b]CASH[/] %s=%.3f" % (csid, user.balance))
 
     def adjust_holding(self, csid, symbol, adjust_qty):
-        with persistence.StockSqliteUoW() as uow:
+        with self.stock_uow() as uow:
             # Try out cached list
             stock_list = uow.stocks.list()
             if not symbol in stock_list:
                 raise Exception("Unknown symbol")
             stock = uow.stocks.get(symbol)
 
-        with persistence.MemoryClientUoW() as uow:
+        with self.user_uow() as uow:
             user = uow.users.get(csid)
             if symbol not in user.holdings:
                 user.holdings[symbol] = 0
@@ -82,7 +79,7 @@ class Exchange:
     def recv(self, msg):
         if msg["txid"] in self.txid_set:
             raise Exception("Duplicate transaction")
-        with persistence.MemoryClientUoW() as uow:
+        with self.user_uow() as uow:
             user = uow.users.get(msg["csid"])
             if not user:
                 raise Exception("Unknown user")
@@ -96,7 +93,7 @@ class Exchange:
             volume=msg["volume"],
             ts=int(time.time()),
         )
-        with persistence.StockSqliteUoW() as uow:
+        with self.stock_uow() as uow:
             stock = uow.stocks.get(order.symbol)
         if not stock:
             raise Exception("Unknown symbol")
@@ -104,7 +101,10 @@ class Exchange:
         try:
             # Good transaction isolation is going to be needed to ensure balance
             # and holdings stay positive in the event of concurrent order handlers
-            user = get_user(order.csid)
+            with self.user_uow() as uow:
+                user = uow.users.get(order.csid)
+                if not user:
+                    raise Exception("Unknown user")
             self.validate_preorder(user, order)
         except Exception as e:
             raise e
