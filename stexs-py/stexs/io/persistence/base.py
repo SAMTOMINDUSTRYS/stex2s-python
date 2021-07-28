@@ -4,9 +4,6 @@
 import abc
 from stexs.domain import model
 import copy
-import time
-
-from stexs.services.logger import log
 
 class AbstractRepository(abc.ABC):
 
@@ -96,38 +93,6 @@ class GenericMemoryRepository(AbstractRepository):
         self._staged_objects = {}
 
 
-class MemoryClientUoW(AbstractUoW):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.users = GenericMemoryRepository(prefix="clients")
-
-    def commit(self):
-        self.users._commit()
-        for user_id, user in self.users._staged_objects.items():
-            if self.users._versions[user_id] == 1:
-                log.info("[bold red]USER[/] Registered [b]%s[/] %s" % (user.csid, user.name))
-        self.committed = True
-
-    def rollback(self):
-        pass
-
-
-class MemoryStockUoW(AbstractUoW):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.stocks = GenericMemoryRepository(prefix="stocks", stexid="symbol")
-
-    def commit(self):
-        self.stocks._commit()
-        for symbol, stock in self.stocks._staged_objects.items():
-            if self.stocks._versions[symbol] == 1:
-                log.info("[bold red]MRKT[/] Listed [b]%s[/] %s" % (stock.symbol, stock.name))
-        self.committed = True
-
-    def rollback(self):
-        pass
-
-
 ###############################################################################
 
 from sqlalchemy.exc import NoResultFound # Could wrap this?
@@ -151,33 +116,9 @@ class GenericSqliteRepository(AbstractRepository):
         except NoResultFound:
             return None
 
-
-class StockSqliteRepository(GenericSqliteRepository):
-
-    _stock_cache = []
-    _stock_stamp = None
-
-    def _get(self, stock_symbol):
-        return self.session.query(model.Stock).filter_by(symbol=stock_symbol).one()
-
-    # TODO Should come from an abc for Stock
-    def list(self):
-        # TODO Probably better to do this with a decorator or the like but still,
-        # interesting to see that we can quickly add this sort of stuff from the Repo!
-        log.critical(StockSqliteRepository._stock_stamp)
-        if not StockSqliteRepository._stock_stamp or (int(time.time()) - StockSqliteRepository._stock_stamp) > 60:
-            StockSqliteRepository._stock_cache = [x[0] for x in self.session.query(model.Stock).with_entities(model.Stock.symbol).all()]
-            StockSqliteRepository._stock_stamp = int(time.time())
-            log.debug("Refreshing Stock cache")
-        log.critical(StockSqliteRepository._stock_cache)
-        return StockSqliteRepository._stock_cache
-
-
-class StockSqliteUoW(AbstractUoW):
-
+class GenericSqliteUoW(AbstractUoW):
     def __enter__(self, session_factory=StexSqliteSessionFactory):
         self.session = session_factory.get_session()
-        self.stocks = StockSqliteRepository(self.session)
         return super().__enter__()
 
     def __exit__(self, *args):
@@ -189,5 +130,6 @@ class StockSqliteUoW(AbstractUoW):
 
     def rollback(self):
         self.session.rollback()
+
 
 ###############################################################################

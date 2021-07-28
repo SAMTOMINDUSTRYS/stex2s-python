@@ -1,6 +1,6 @@
 from stexs.domain import model
 from stexs.services.logger import log
-from stexs.io import persistence
+import stexs.io.persistence as iop
 from typing import List, Dict
 import time
 
@@ -11,8 +11,8 @@ class Exchange:
         self.stalls = {} # Dict[str, model.MarketStall] = field(default_factory = dict)
 
         # TODO Little hack for now
-        self.stock_uow = persistence.StockSqliteUoW
-        self.user_uow = persistence.MemoryClientUoW
+        self.stock_uow = iop.stock.StockSqliteUoW
+        self.user_uow = iop.user.MemoryClientUoW
 
     def add_stocks(self, stocks: List[model.Stock]):
         with self.stock_uow() as uow:
