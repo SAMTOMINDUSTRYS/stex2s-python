@@ -24,26 +24,28 @@ class OrderMemoryRepository(AbstractRepository):
 
     def add(self, order: model.Order):
         if order.symbol not in self._staged_objects:
-            self._staged_objects[order.symbol] = []
-        self._staged_objects[order.symbol].append(order)
+            self._staged_objects[order.symbol] = {}
+        self._staged_objects[order.symbol][order.txid] = order
         log.info("[bold white]ORDR[/] [b]%s[/] %s" % (order.symbol, order))
 
     def get_buy_book_for_symbol(self, symbol: str):
-        book = [order for order in self._objects[symbol] if not order.closed and order.side == "BUY"]
+        book = [order for order in self._objects[symbol].values() if not order.closed and order.side == "BUY"]
         book = sorted(book, key=lambda order: (-order.price, order.ts, order.txid))
         return book
 
     def get_sell_book_for_symbol(self, symbol: str):
-        book = [order for order in self._objects[symbol] if not order.closed and order.side == "SELL"]
+        book = [order for order in self._objects[symbol].values() if not order.closed and order.side == "SELL"]
         book = sorted(book, key=lambda order: (order.price, order.ts, order.txid))
         return book
 
     def get(self, txid: str):
         #CRIT TODO bad
         for symbol in self._objects:
-            for order in self._objects[symbol]:
-                if txid == order.txid:
-                    return copy.deepcopy(order)
+            if txid in self._objects[symbol]:
+                if symbol not in self._staged_objects:
+                    self._staged_objects[symbol] = {}
+                self._staged_objects[symbol][txid] = copy.deepcopy(self._objects[symbol][txid])
+                return self._staged_objects[symbol][txid]
         return None
 
         # Providing read committed isolation as only committed data can be
@@ -56,15 +58,16 @@ class OrderMemoryRepository(AbstractRepository):
     def _commit(self):
         for symbol in self._staged_objects:
             if symbol not in self._objects:
-                self._objects[symbol] = []
+                self._objects[symbol] = {}
 
-            for order in self._staged_objects[symbol]:
+            for txid, order in self._staged_objects[symbol].items():
                 #if not self._objects.get(obj_id):
                 #    self._versions[obj_id] = 0
                 #else:
                 #    if self._versions[obj_id] != self._staged_versions[obj_id]:
                 #        raise Exception("Concurrent commit rejected")
-                self._objects[symbol].append(order)
+
+                self._objects[symbol][txid] = order
                 #self._versions[obj_id] += 1
 
         # Reset staged objects?
