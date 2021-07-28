@@ -14,7 +14,7 @@ class StexSqliteSessionFactory():
     def get_session(cls):
         # TODO Probably do this once in bootstrap somewhere?
         if not cls.__engine:
-            cls.__engine = create_engine(config.SQLITE_URL)
+            cls.__engine = create_engine(config.get_sqlite_url())
             metadata.create_all(cls.__engine) # TODO Creating tables probably not in scope of session making...
         return sessionmaker(
                 autocommit=False,
