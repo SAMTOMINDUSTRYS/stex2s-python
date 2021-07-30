@@ -99,6 +99,7 @@ class Exchange:
         if not stock:
             raise Exception("Unknown symbol")
 
+        # Check this order can be completed before processing it
         try:
             # Good transaction isolation is going to be needed to ensure balance
             # and holdings stay positive in the event of concurrent order handlers
@@ -110,14 +111,24 @@ class Exchange:
         except Exception as e:
             raise e
 
-        # Bit of a cheat to return this stuff here but let's keep it simple
-        buys, sells = orderbook.handle_order(order.symbol, order)
+        # Process order
+        buys, sells = orderbook.add_order(order.symbol, order)
         self.update_users(buys, sells)
 
+        summary = orderbook.summarise_books(order.symbol)
+        log.info("[bold green]BOOK[/] [b]%s[/] %s" % (order.symbol, str(summary)))
+
         # Need to handle the market tick async from messages but this will do for now
-        buys, sells, trades = orderbook.handle_market(order.symbol)
+        buys, sells, trades = orderbook.match_orderbook(order.symbol)
         for trade in trades:
             self.stalls[order.symbol].log_trade(trade)
+        summary = orderbook.summarise_books(order.symbol)
+        log.info("[bold green]BOOK[/] [b]%s[/] %s" % (order.symbol, str(summary)))
+
+        buy_str, sell_str = orderbook.summarise_orderbook(order.symbol)
+        log.info(buy_str)
+        log.info(sell_str)
+
         self.update_users(buys, sells, executed=True)
 
         # Idempotent txid

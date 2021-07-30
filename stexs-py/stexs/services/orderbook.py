@@ -5,12 +5,8 @@ import copy
 
 ORDER_UOW = iop.order.OrderMemoryUoW
 
-def handle_order(symbol:str, order: model.Order):
+def add_order(symbol:str, order: model.Order):
     with ORDER_UOW() as uow:
-
-        # Assume the order goes through with no trouble
-        #self.add_order(msg)
-        # and hackily add the order to the actions to be bubbled up to STEX
         uow.orders.add(order)
         uow.commit()
 
@@ -23,13 +19,10 @@ def handle_order(symbol:str, order: model.Order):
 
         return buys, sells
 
-def match_one(symbol, uow):
+def match_one(buy_book, sell_book):
     done = False
 
     new_orders = []
-
-    buy_book = uow.orders.get_buy_book_for_symbol(symbol)
-    sell_book = uow.orders.get_sell_book_for_symbol(symbol)
 
     for buy in buy_book:
         if buy.closed:
@@ -207,22 +200,21 @@ def summarise_books(symbol):
         }
 
 
-def handle_market(symbol):
+def match_orderbook(symbol):
     # Trigger match process
     # TODO Needs to be done somewhere else
     #       Will need to think about how this can be thread-safe if we move
     #       matching/trading to a separate thread from adding orders
-    summary = summarise_books(symbol)
-    log.info("[bold green]BOOK[/] [b]%s[/] %s" % (symbol, str(summary)))
-    with ORDER_UOW() as uow:
-        fulfilled_orders = match_one(symbol, uow)
-
 
     # If we have to return here to execute orders, we can only match once
     buys = []
     sells = []
     trades = []
     with ORDER_UOW() as uow:
+        buy_book = uow.orders.get_buy_book_for_symbol(symbol)
+        sell_book = uow.orders.get_sell_book_for_symbol(symbol)
+        fulfilled_orders = match_one(buy_book, sell_book)
+
         for order in fulfilled_orders:
             trade = execute_trade(order["buy"], order["sells"], excess=order["excess"])
             trades.append(trade)
@@ -232,21 +224,21 @@ def handle_market(symbol):
             for sell in order["sells"]:
                 sells.append(uow.orders.get(sell))
 
+    # Sneaky way of getting actions back up to the Exchange, we'll obviously
+    # want to do this async, and not in the order handler
+    return buys, sells, trades
+
+def summarise_orderbook(symbol):
     with ORDER_UOW() as uow:
         buy_book = uow.orders.get_buy_book_for_symbol(symbol)
         sell_book = uow.orders.get_sell_book_for_symbol(symbol)
+
         # some gross logging for now
         buy_str = []
         for order in buy_book:
             buy_str.append("%s#%d@%.3f" % (order.txid, order.volume, order.price))
-        log.info(buy_str)
         sell_str = []
         for order in sell_book:
             sell_str.append("%s#%d@%.3f" % (order.txid, order.volume, order.price))
-        log.info(sell_str)
-    summary = summarise_books(symbol)
-    log.info("[bold green]BOOK[/] [b]%s[/] %s" % (symbol, str(summary)))
 
-    # Sneaky way of getting actions back up to the Exchange, we'll obviously
-    # want to do this async, and not in the order handler
-    return buys, sells, trades
+    return buy_str, sell_str
