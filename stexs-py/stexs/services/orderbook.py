@@ -38,7 +38,6 @@ def match_one(buy_book, sell_book):
             # Abort on closed buy
             break
 
-        buy_filled = False
         buy_sells = []
         curr_volume = 0
 
@@ -53,30 +52,23 @@ def match_one(buy_book, sell_book):
             sell_price = sell.price
             sell_volume = sell.volume
 
-            # If the buy match or exceeds the sell price, we can trade
-            if buy_price >= sell_price:
-                curr_volume += sell_volume
-                buy_sells.append(sell)
-
-                if curr_volume >= buy_volume:
-                    # Either volume is just right or there is some excess to split into new Order
-                    buy_filled = True
-                else:
-                    # Not enough volume, keep iterating Orders
-                    continue
-
-                if buy_filled:
-                    proposed_trades.append(
-                            propose_trade(buy, buy_sells, excess=curr_volume - buy_volume)
-                    )
-                    done = True # Force update before running match again
-                    break # Don't keep trying to add sells to this buy!
-
-            else:
-                # Sells are sorted, so if we have not filled this buy there
-                # are no more sells at the right price range
+            if buy_price < sell_price:
+                # Sells are sorted, so if we cannot afford this sell, there won't
+                # be any more sells at the right price range
                 done = True
                 break
+
+            # If the buy match or exceeds the sell price, we can trade
+            curr_volume += sell_volume
+            buy_sells.append(sell)
+
+            if curr_volume >= buy_volume:
+                # Either volume is just right or there is some excess to split into new Order
+                proposed_trades.append(
+                        propose_trade(buy, buy_sells, excess=curr_volume - buy_volume)
+                )
+                done = True # Force update before running match again
+                break # Don't keep trying to add sells to this buy!
 
         if done:
             break
