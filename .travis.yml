@@ -1,0 +1,12 @@
+anguage: python
+python:
+  - "3.6"      # current default Python on Travis CI
+
+install:
+  - pip install pytest sqlalchemy coverage
+
+script:
+  - coverage run --source='.' pytest tests
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
