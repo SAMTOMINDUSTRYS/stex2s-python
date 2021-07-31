@@ -1,5 +1,6 @@
 from stexs.domain import model
 from stexs.services.exchange import Exchange
+from stexs.services.broker import Broker
 
 if __name__ == "__main__":
     stex = Exchange()
@@ -10,17 +11,21 @@ if __name__ == "__main__":
     ]
     stex.add_stocks(stocks)
 
+    broker = Broker(code="MAGENTA", name="Magenta Holdings Plc.")
     clients = [
         model.Client(csid="1", name="Sam"),
     ]
-    stex.add_users(clients)
-    stex.adjust_balance(csid="1", adjust_balance=+100000)
-    stex.adjust_holding(csid="1", symbol="STI.", adjust_qty=+10000)
-    stex.adjust_holding(csid="1", symbol="ELAN", adjust_qty=+10000)
+    broker.add_users(clients)
+    broker.adjust_balance(csid="1", adjust_balance=+100000)
+    broker.adjust_holding(csid="1", symbol="STI.", adjust_qty=+10000)
+    broker.adjust_holding(csid="1", symbol="ELAN", adjust_qty=+10000)
+
+    stex.add_broker(broker)
 
 
     stex.recv({
         "txid": "1",
+        "broker": "MAGENTA",
         "csid": "1",
         "side": "SELL",
         "symbol": "STI.",
@@ -29,6 +34,7 @@ if __name__ == "__main__":
     })
     stex.recv({
         "txid": "2",
+        "broker": "MAGENTA",
         "csid": "1",
         "side": "SELL",
         "symbol": "STI.",
@@ -37,6 +43,7 @@ if __name__ == "__main__":
     })
     stex.recv({
         "txid": "3",
+        "broker": "MAGENTA",
         "csid": "1",
         "side": "BUY",
         "symbol": "STI.",
@@ -45,6 +52,7 @@ if __name__ == "__main__":
     })
     stex.recv({
         "txid": "4",
+        "broker": "MAGENTA",
         "csid": "1",
         "side": "BUY",
         "symbol": "STI.",
@@ -53,6 +61,7 @@ if __name__ == "__main__":
     })
     stex.recv({
         "txid": "5",
+        "broker": "MAGENTA",
         "csid": "1",
         "side": "SELL",
         "symbol": "STI.",
@@ -61,6 +70,7 @@ if __name__ == "__main__":
     })
     stex.recv({
         "txid": "6",
+        "broker": "MAGENTA",
         "csid": "1",
         "side": "BUY",
         "symbol": "STI.",
@@ -69,6 +79,7 @@ if __name__ == "__main__":
     })
     stex.recv({
         "txid": "7",
+        "broker": "MAGENTA",
         "csid": "1",
         "side": "BUY",
         "symbol": "STI.",
@@ -77,6 +88,7 @@ if __name__ == "__main__":
     })
     stex.recv({
         "txid": "8",
+        "broker": "MAGENTA",
         "csid": "1",
         "side": "SELL",
         "symbol": "ELAN",
@@ -85,6 +97,7 @@ if __name__ == "__main__":
     })
     stex.recv({
         "txid": "9",
+        "broker": "MAGENTA",
         "csid": "1",
         "side": "BUY",
         "symbol": "ELAN",
