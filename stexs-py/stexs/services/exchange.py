@@ -89,10 +89,6 @@ class Exchange:
             summary = orderbook.summarise_books_for_symbol(symbol)
             log.info("[bold green]BOOK[/] [b]%s[/] %s" % (symbol, str(summary)))
 
-            buy_str, sell_str = orderbook.summarise_orderbook(symbol)
-            log.info(buy_str)
-            log.info(sell_str)
-
 
     def clear_trade(self):
         pass

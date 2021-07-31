@@ -219,17 +219,3 @@ def match_orderbook(symbol, uow_cls=ORDER_UOW):
         sell_book = uow.orders.get_sell_book_for_symbol(symbol)
         return match_one(buy_book, sell_book)
 
-def summarise_orderbook(symbol):
-    with ORDER_UOW() as uow:
-        buy_book = uow.orders.get_buy_book_for_symbol(symbol)
-        sell_book = uow.orders.get_sell_book_for_symbol(symbol)
-
-        # some gross logging for now
-        buy_str = []
-        for order in buy_book:
-            buy_str.append("%s#%d@%.3f" % (order.txid, order.volume, order.price))
-        sell_str = []
-        for order in sell_book:
-            sell_str.append("%s#%d@%.3f" % (order.txid, order.volume, order.price))
-
-    return buy_str, sell_str
