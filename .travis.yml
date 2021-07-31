@@ -1,4 +1,4 @@
-anguage: python
+language: python
 python:
   - "3.7" # dataclasses needs py3.7
 
