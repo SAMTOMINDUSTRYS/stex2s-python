@@ -6,7 +6,7 @@ install:
   - pip install pytest sqlalchemy coverage
 
 script:
-  - coverage run --source='.' -m pytest tests
+  - coverage run --source='stexs/' -m pytest stexs/tests
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
