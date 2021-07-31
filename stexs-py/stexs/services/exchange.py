@@ -75,13 +75,17 @@ class Exchange:
         # Repeat trading until no trades are left
         while True:
             # Need to handle the market tick async from messages but this will do for now
-            buys, sells, trades = orderbook.match_orderbook(symbol)
-
-            if len(trades) == 0:
+            proposed_trades = orderbook.match_orderbook(symbol)
+            if len(proposed_trades) == 0:
                 break
 
-            for trade in trades:
+            for trade in proposed_trades:
+                buys, sells = orderbook.execute_trade(trade) # commit the Trade and close the orders
+                self.update_users(buys, sells, executed=True) # update client holdings and balances
+
                 self.stalls[symbol].log_trade(trade)
+                log.info(trade)
+
             summary = orderbook.summarise_books(symbol)
             log.info("[bold green]BOOK[/] [b]%s[/] %s" % (symbol, str(summary)))
 
@@ -89,7 +93,9 @@ class Exchange:
             log.info(buy_str)
             log.info(sell_str)
 
-            self.update_users(buys, sells, executed=True)
+
+    def clear_trade(self):
+        pass
 
     def recv(self, msg):
         if msg["txid"] in self.txid_set:

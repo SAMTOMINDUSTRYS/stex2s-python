@@ -2,11 +2,12 @@ from stexs.domain import model
 from stexs.services.logger import log
 import stexs.io.persistence as iop
 import copy
+from typing import List
 
 ORDER_UOW = iop.order.OrderMemoryUoW
 
-def add_order(order: model.Order, uow=ORDER_UOW):
-    with ORDER_UOW() as uow:
+def add_order(order: model.Order, uow_cls=ORDER_UOW):
+    with uow_cls() as uow:
         uow.orders.add(order)
         uow.commit()
 
@@ -19,10 +20,18 @@ def add_order(order: model.Order, uow=ORDER_UOW):
 
         return buys, sells
 
+#CRIT TODO Look up all txids at the same time
+def close_txids(txids: List[str], uow_cls=ORDER_UOW):
+    with uow_cls() as uow:
+        for txid in txids:
+            order = uow.orders.get(txid)
+            order.closed = True
+        uow.commit()
+
 def match_one(buy_book, sell_book):
     done = False
 
-    new_orders = []
+    proposed_trades = []
 
     for buy in buy_book:
         if buy.closed:
@@ -57,12 +66,9 @@ def match_one(buy_book, sell_book):
                     continue
 
                 if buy_filled:
-                    #self.trade(buy=buy, sells=buy_sells, excess=curr_volume-buy_volume)
-                    new_orders.append({
-                        "buy": buy.txid,
-                        "sells": [sell.txid for sell in buy_sells],
-                        "excess": curr_volume - buy_volume,
-                    })
+                    proposed_trades.append(
+                            propose_trade(buy, buy_sells, excess=curr_volume - buy_volume)
+                    )
                     done = True # Force update before running match again
                     break # Don't keep trying to add sells to this buy!
 
@@ -75,67 +81,72 @@ def match_one(buy_book, sell_book):
         if done:
             break
 
-    return new_orders
+    return proposed_trades
 
 
-def execute_trade(buy, sells, excess=0):
-    with ORDER_UOW() as uow:
-        # Close buy and sells
-        buy = uow.orders.get(buy)
-        buy.closed = True
-        for sell in sells:
-            sell = uow.orders.get(sell)
-            sell.closed = True
-        uow.commit()
+def propose_trade(buy: model.Order, sells: List[model.Order], excess=0):
+    # Calculate average price of fulfilled buy
+    tot_price = 0
+    sell_txids = []
+    for i_sell, sell in enumerate(sells):
+        sell_txids.append(sell.txid)
 
-    # Price
-    with ORDER_UOW() as uow:
-        tot_price = 0
-        sell_txids = []
-        for i_sell, sell in enumerate(sells):
-            sell = uow.orders.get(sell)
-            sell_txids.append(sell.txid)
+        if i_sell == len(sells)-1:
+            tot_price += (sell.price * (sell.volume - excess))
+        else:
+            tot_price += (sell.price * sell.volume)
 
-            if i_sell == len(sells)-1:
-                tot_price += (sell.price * (sell.volume - excess))
-            else:
-                tot_price += (sell.price * sell.volume)
-
-    # Record Trade
-    trade = model.Trade(
+    return model.Trade(
         symbol=buy.symbol,
         volume=buy.volume,
         buy_txid=buy.txid,
         sell_txids=sell_txids,
         avg_price=tot_price/buy.volume,
         total_price=tot_price,
-        closed=True,
+        excess=excess,
+        closed=False,
     )
 
-    # Finally, if Sell volume exceeded requirement, split the final sell into a new Order
-    if excess > 0:
-        with ORDER_UOW() as uow:
 
-            last_sell = uow.orders.get(sells[-1])
-            last_sell.volume -= excess
+def execute_trade(trade: model.Trade, uow_cls=ORDER_UOW):
 
-            # new_sell.ts does not get updated
-            new_sell = copy.copy(last_sell)
-            new_sell.closed = False
-            new_sell.volume = excess
+    with uow_cls() as uow:
+        # Close all transactions
+        #TODO Pass the uow from this scope in to join them together
+        close_txids([trade.buy_txid] + trade.sell_txids)
 
-            # Fiddle the txid so we know it is a split
-            if '/' in new_sell.txid:
-                split_num = int(new_sell.txid.split('/')[1])+1
-            else:
-                split_num = 1
-            new_sell.txid += '/%d' % split_num
+        # Finally, if Sell volume exceeded requirement, split the final sell into a new Order
+        if trade.excess > 0:
 
-            uow.orders.add(new_sell)
-            uow.commit()
-            #self.orderbook.add_order(new_sell)
+                last_sell = uow.orders.get(trade.sell_txids[-1])
+                last_sell.volume -= trade.excess
 
-    return trade
+                # new_sell.ts does not get updated
+                new_sell = copy.copy(last_sell)
+                new_sell.closed = False
+                new_sell.volume = trade.excess
+
+                # Fiddle the txid so we know it is a split
+                if '/' in new_sell.txid:
+                    split_num = int(new_sell.txid.split('/')[1])+1
+                else:
+                    split_num = 1
+                new_sell.txid += '/%d' % split_num
+
+                uow.orders.add(new_sell)
+                uow.commit()
+
+    # TODO Persist the Trade itself
+    trade.closed = True
+
+    with uow_cls() as uow:
+        confirmed_buys = [uow.orders.get(trade.buy_txid)]
+        confirmed_sells = []
+        for sell in trade.sell_txids:
+            confirmed_sells.append(uow.orders.get(sell))
+
+    # TODO Join this at the Exchange level to transfer assets in the same transaction
+    return confirmed_buys, confirmed_sells
 
 
 def current_buy(symbol:str):
@@ -202,31 +213,12 @@ def summarise_books(symbol):
 
 def match_orderbook(symbol):
     # Trigger match process
-    # TODO Needs to be done somewhere else
     #       Will need to think about how this can be thread-safe if we move
     #       matching/trading to a separate thread from adding orders
-
-    # If we have to return here to execute orders, we can only match once
-    buys = []
-    sells = []
-    trades = []
     with ORDER_UOW() as uow:
         buy_book = uow.orders.get_buy_book_for_symbol(symbol)
         sell_book = uow.orders.get_sell_book_for_symbol(symbol)
-        fulfilled_orders = match_one(buy_book, sell_book)
-
-        for order in fulfilled_orders:
-            trade = execute_trade(order["buy"], order["sells"], excess=order["excess"])
-            trades.append(trade)
-            log.info(trade)
-
-            buys.append(uow.orders.get(order["buy"]))
-            for sell in order["sells"]:
-                sells.append(uow.orders.get(sell))
-
-    # Sneaky way of getting actions back up to the Exchange, we'll obviously
-    # want to do this async, and not in the order handler
-    return buys, sells, trades
+        return match_one(buy_book, sell_book)
 
 def summarise_orderbook(symbol):
     with ORDER_UOW() as uow:

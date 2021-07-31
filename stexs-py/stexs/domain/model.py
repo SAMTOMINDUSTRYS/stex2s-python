@@ -33,6 +33,7 @@ class Trade:
     total_price: float
     volume: int
     closed: bool = False
+    excess: int = 0 # TODO CRIT Cheeky way of keeping size of excess last sell
     sell_txids: List[str] = field(default_factory = List)
 
 @dataclass
