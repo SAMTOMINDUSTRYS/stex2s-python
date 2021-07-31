@@ -142,18 +142,6 @@ def execute_trade(trade: model.Trade, uow_cls=ORDER_UOW):
     return confirmed_buys, confirmed_sells
 
 
-def current_buy(symbol:str):
-    with ORDER_UOW() as uow:
-        book = uow.orders.get_buy_book_for_symbol(symbol)
-        return book[0].price
-
-def current_sell(symbol:str):
-    with ORDER_UOW() as uow:
-        book = uow.orders.get_sell_book_for_symbol(symbol)
-        return book[0].price
-
-
-
 def summarise_books(buy_book, sell_book, buy=None, sell=None):
     dbuys = dsells = 0
     nbuys = nsells = 0
