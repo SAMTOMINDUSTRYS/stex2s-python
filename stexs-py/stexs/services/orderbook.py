@@ -153,10 +153,51 @@ def current_sell(symbol:str):
         return book[0].price
 
 
-def summarise_books(symbol):
-    with ORDER_UOW() as uow:
+
+def summarise_books(buy_book, sell_book, buy=None, sell=None):
+    dbuys = dsells = 0
+    nbuys = nsells = 0
+    vbuys = vsells = 0
+
+    for order in buy_book:
+        if order.closed:
+            continue
+        dbuys +=1
+
+        if buy:
+            if order.price == buy:
+                nbuys += 1
+                vbuys += order.volume
+
+    for order in sell_book:
+        if order.closed:
+            continue
+        dsells +=1
+
+        if sell:
+            if order.price == sell:
+                nsells += 1
+                vsells += order.volume
+
+    return {
+        "dbuys": dbuys,
+        "dsells": dsells,
+
+        "nbuys": nbuys,
+        "nsells": nsells,
+
+        "vbuys": vbuys,
+        "vsells": vsells,
+
+        "buy": buy,
+        "sell": sell,
+    }
+
+def summarise_books_for_symbol(symbol, uow_cls=ORDER_UOW):
+    with uow_cls() as uow:
         buy_book = uow.orders.get_buy_book_for_symbol(symbol)
         sell_book = uow.orders.get_sell_book_for_symbol(symbol)
+
         try:
             buy = buy_book[0].price
         except:
@@ -167,42 +208,7 @@ def summarise_books(symbol):
         except:
             sell = None
 
-        dbuys = dsells = 0
-        nbuys = nsells = 0
-        vbuys = vsells = 0
-
-        for order in buy_book:
-            if order.closed:
-                continue
-            dbuys +=1
-
-            if order.price == buy:
-                nbuys += 1
-                vbuys += order.volume
-
-        for order in sell_book:
-            if order.closed:
-                continue
-            dsells +=1
-
-            if order.price == sell:
-                nsells += 1
-                vsells += order.volume
-
-        return {
-            "dbuys": dbuys,
-            "dsells": dsells,
-
-            "nbuys": nbuys,
-            "nsells": nsells,
-
-            "vbuys": vbuys,
-            "vsells": vsells,
-
-            "buy": buy,
-            "sell": sell,
-        }
-
+        return summarise_books(buy_book, sell_book, buy=buy, sell=sell)
 
 def match_orderbook(symbol, uow_cls=ORDER_UOW):
     # Trigger match process

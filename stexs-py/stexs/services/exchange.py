@@ -69,7 +69,7 @@ class Exchange:
         buys, sells = orderbook.add_order(order)
         self.update_users(buys, sells)
 
-        summary = orderbook.summarise_books(symbol)
+        summary = orderbook.summarise_books_for_symbol(symbol)
         log.info("[bold green]BOOK[/] [b]%s[/] %s" % (symbol, str(summary)))
 
         # Repeat trading until no trades are left
@@ -86,7 +86,7 @@ class Exchange:
                 self.stalls[symbol].log_trade(trade)
                 log.info(trade)
 
-            summary = orderbook.summarise_books(symbol)
+            summary = orderbook.summarise_books_for_symbol(symbol)
             log.info("[bold green]BOOK[/] [b]%s[/] %s" % (symbol, str(summary)))
 
             buy_str, sell_str = orderbook.summarise_orderbook(symbol)

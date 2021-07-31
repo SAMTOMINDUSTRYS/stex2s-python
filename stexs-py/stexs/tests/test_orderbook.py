@@ -216,6 +216,9 @@ def test_match_orderbook():
 
 
 def test_execute_trade():
+    with TEST_ORDER_UOW() as uow:
+        uow.orders._objects.clear()
+
     buys = [
         model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
@@ -242,14 +245,88 @@ def test_execute_trade():
                 assert sell.volume == 100
 
                 # Check for remainder sell
-                sell_book = uow.orders.get_sell_book_for_symbol(sell.symbol)
-                remaining_sell = None
-                for rsell in sell_book:
-                    if '/' in rsell.txid:
-                        if rsell.txid.split('/')[0] == '2':
-                            assert rsell.txid == '2/3'
-                            remaining_sell = rsell
-
+                remaining_sell = uow.orders.get_sell_book_for_symbol(sell.symbol)[0]
                 assert remaining_sell is not None
+                assert remaining_sell.txid == "2/3"
                 assert remaining_sell.volume == 50
 
+
+def test_summarise_empty_books():
+    buy_book = []
+    sell_book = []
+    buy = sell = None
+
+    expected_summary = {
+        "dbuys": 0,
+        "dsells": 0,
+        "nbuys": 0,
+        "nsells": 0,
+        "vbuys": 0,
+        "vsells": 0,
+        "buy": None,
+        "sell": None
+    }
+    actual_summary = orderbook.summarise_books(buy_book, sell_book, buy=buy, sell=sell)
+    assert expected_summary == actual_summary
+
+
+def test_summarise_some_books():
+    buy_book = [
+        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+        model.Order(txid="6", csid="1", side="BUY", symbol="STI.", price=1.0, volume=300, ts=1),
+        model.Order(txid="4", csid="1", side="BUY", symbol="STI.", price=0.9, volume=100, ts=1),
+        model.Order(txid="5", csid="1", side="BUY", symbol="STI.", price=0.9, volume=100, ts=1),
+    ]
+    sell_book = [
+        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
+        model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
+    ]
+    buy = 1
+    sell = 2
+
+    expected_summary = {
+        "dbuys": 4,
+        "dsells": 2,
+        "nbuys": 2,
+        "nsells": 2,
+        "vbuys": 400,
+        "vsells": 200,
+        "buy": 1,
+        "sell": 2
+    }
+    actual_summary = orderbook.summarise_books(buy_book, sell_book, buy=buy, sell=sell)
+    assert expected_summary == actual_summary
+
+
+# Test the summarise_books_for_symbol returns a summary as expected
+# Not necessarily testing the summarise_books itself
+def test_summarise_some_books_for_symbol():
+    with TEST_ORDER_UOW() as uow:
+        uow.orders._objects.clear()
+
+    buy_book = [
+        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+        model.Order(txid="6", csid="1", side="BUY", symbol="STI.", price=1.0, volume=300, ts=1),
+        model.Order(txid="4", csid="1", side="BUY", symbol="STI.", price=0.9, volume=100, ts=1),
+        model.Order(txid="5", csid="1", side="BUY", symbol="STI.", price=0.9, volume=100, ts=1),
+    ]
+    sell_book = [
+        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
+        model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
+    ]
+    wrap_service_add_orders(buy_book)
+    wrap_service_add_orders(sell_book)
+
+    expected_summary = {
+        "dbuys": 4,
+        "dsells": 2,
+        "nbuys": 2,
+        "nsells": 2,
+        "vbuys": 400,
+        "vsells": 200,
+        "buy": 1,
+        "sell": 2
+    }
+
+    actual_summary = orderbook.summarise_books_for_symbol("STI.", uow_cls=TEST_ORDER_UOW)
+    assert expected_summary == actual_summary
