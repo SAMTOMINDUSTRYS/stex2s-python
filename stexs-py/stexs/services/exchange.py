@@ -52,9 +52,10 @@ class Exchange:
             ts=int(time.time()),
         )
         with self.stock_uow() as uow:
-            stock = uow.stocks.get(order.symbol)
-        if not stock:
-            raise Exception("Unknown symbol")
+            try:
+                symbol = uow.stocks.get(order.symbol).symbol
+            except AttributeError:
+                raise Exception("Unknown symbol")
 
         # Check this order can be completed before processing it
         # Good transaction isolation is going to be needed to ensure balance
@@ -65,26 +66,26 @@ class Exchange:
             raise e
 
         # Process order
-        buys, sells = orderbook.add_order(order.symbol, order)
+        buys, sells = orderbook.add_order(symbol, order)
         self.update_users(buys, sells)
 
-        summary = orderbook.summarise_books(order.symbol)
-        log.info("[bold green]BOOK[/] [b]%s[/] %s" % (order.symbol, str(summary)))
+        summary = orderbook.summarise_books(symbol)
+        log.info("[bold green]BOOK[/] [b]%s[/] %s" % (symbol, str(summary)))
 
         # Repeat trading until no trades are left
         while True:
             # Need to handle the market tick async from messages but this will do for now
-            buys, sells, trades = orderbook.match_orderbook(order.symbol)
+            buys, sells, trades = orderbook.match_orderbook(symbol)
 
             if len(trades) == 0:
                 break
 
             for trade in trades:
-                self.stalls[order.symbol].log_trade(trade)
-            summary = orderbook.summarise_books(order.symbol)
-            log.info("[bold green]BOOK[/] [b]%s[/] %s" % (order.symbol, str(summary)))
+                self.stalls[symbol].log_trade(trade)
+            summary = orderbook.summarise_books(symbol)
+            log.info("[bold green]BOOK[/] [b]%s[/] %s" % (symbol, str(summary)))
 
-            buy_str, sell_str = orderbook.summarise_orderbook(order.symbol)
+            buy_str, sell_str = orderbook.summarise_orderbook(symbol)
             log.info(buy_str)
             log.info(sell_str)
 
