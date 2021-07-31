@@ -145,3 +145,26 @@ def test_match_buy_with_insufficient_sell():
     assert len(trades) == 0
 
 
+def test_match_aborts_on_closed_buy():
+    buys = [
+        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1, closed=True),
+    ]
+    sells = [
+        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
+    ]
+    trades = wrap_service_match_one(buys, sells)
+    assert len(trades) == 0
+
+
+def test_match_skips_on_closed_sell():
+    buys = [
+        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+    ]
+    sells = [
+        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1, closed=True),
+        model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
+    ]
+    trades = wrap_service_match_one(buys, sells)
+    assert len(trades) == 1
+    assert trades[0]["sells"] == ["3"]
+
