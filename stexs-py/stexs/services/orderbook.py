@@ -204,11 +204,11 @@ def summarise_books(symbol):
         }
 
 
-def match_orderbook(symbol):
+def match_orderbook(symbol, uow_cls=ORDER_UOW):
     # Trigger match process
     #       Will need to think about how this can be thread-safe if we move
     #       matching/trading to a separate thread from adding orders
-    with ORDER_UOW() as uow:
+    with uow_cls() as uow:
         buy_book = uow.orders.get_buy_book_for_symbol(symbol)
         sell_book = uow.orders.get_sell_book_for_symbol(symbol)
         return match_one(buy_book, sell_book)

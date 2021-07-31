@@ -189,6 +189,32 @@ def test_match_skips_on_closed_sell():
     assert trades[0].sell_txids == ["3"]
 
 
+# Test the match_orderbook process returns a Trade matching expectations
+# Not necessarily testing the matcher itself
+def test_match_orderbook():
+    expected_trade = model.Trade(
+        symbol="STI.",
+        buy_txid="4",
+        sell_txids=["3", "2"],
+        volume=200,
+        avg_price=0.75,
+        total_price=150,
+        closed=False,
+    )
+
+    orders = [
+        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=0.5, volume=200, ts=1),
+        model.Order(txid="4", csid="1", side="BUY", symbol="STI.", price=1.0, volume=200, ts=1),
+        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
+        model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=0.5, volume=100, ts=1),
+    ]
+    wrap_service_add_orders(orders)
+    actual_trade = orderbook.match_orderbook("STI.", uow_cls=TEST_ORDER_UOW)[0]
+
+    assert expected_trade == actual_trade
+
+
+
 def test_execute_trade():
     buys = [
         model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
