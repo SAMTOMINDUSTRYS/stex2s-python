@@ -71,18 +71,24 @@ class Exchange:
         summary = orderbook.summarise_books(order.symbol)
         log.info("[bold green]BOOK[/] [b]%s[/] %s" % (order.symbol, str(summary)))
 
-        # Need to handle the market tick async from messages but this will do for now
-        buys, sells, trades = orderbook.match_orderbook(order.symbol)
-        for trade in trades:
-            self.stalls[order.symbol].log_trade(trade)
-        summary = orderbook.summarise_books(order.symbol)
-        log.info("[bold green]BOOK[/] [b]%s[/] %s" % (order.symbol, str(summary)))
+        # Repeat trading until no trades are left
+        while True:
+            # Need to handle the market tick async from messages but this will do for now
+            buys, sells, trades = orderbook.match_orderbook(order.symbol)
 
-        buy_str, sell_str = orderbook.summarise_orderbook(order.symbol)
-        log.info(buy_str)
-        log.info(sell_str)
+            if len(trades) == 0:
+                break
 
-        self.update_users(buys, sells, executed=True)
+            for trade in trades:
+                self.stalls[order.symbol].log_trade(trade)
+            summary = orderbook.summarise_books(order.symbol)
+            log.info("[bold green]BOOK[/] [b]%s[/] %s" % (order.symbol, str(summary)))
+
+            buy_str, sell_str = orderbook.summarise_orderbook(order.symbol)
+            log.info(buy_str)
+            log.info(sell_str)
+
+            self.update_users(buys, sells, executed=True)
 
     def recv(self, msg):
         if msg["txid"] in self.txid_set:

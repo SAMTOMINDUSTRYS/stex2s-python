@@ -9,7 +9,7 @@ class MemoryClientUoW(AbstractUoW):
 
     def commit(self):
         self.users._commit()
-        for user_id, user in self.users._staged_objects.items():
+        for user_id, user in self.users._objects.items():
             if self.users._versions[user_id] == 1:
                 log.info("[bold red]USER[/] Registered [b]%s[/] %s" % (user.csid, user.name))
         self.committed = True
