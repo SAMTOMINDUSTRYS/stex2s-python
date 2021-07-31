@@ -30,13 +30,9 @@ class Exchange:
         for broker in self.brokers:
             self.brokers[broker].update_users(buys, sells, executed=executed)
 
-    def recv(self, msg):
-        if msg["txid"] in self.txid_set:
-            raise Exception("Duplicate transaction")
-
+    def handle_order(self, msg):
         if msg["broker"] not in self.brokers:
             raise Exception("Malformed Broker")
-
         user = self.brokers[msg["broker"]].get_user(msg["csid"])
         if not user:
             raise Exception("Unknown user")
@@ -82,6 +78,13 @@ class Exchange:
         log.info(sell_str)
 
         self.update_users(buys, sells, executed=True)
+
+    def recv(self, msg):
+        if msg["txid"] in self.txid_set:
+            raise Exception("Duplicate transaction")
+
+        if msg["type"] == "order":
+            self.handle_order(msg)
 
         # Idempotent txid
         self.txid_set.add(msg["txid"])

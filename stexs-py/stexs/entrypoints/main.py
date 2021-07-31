@@ -24,6 +24,7 @@ if __name__ == "__main__":
 
 
     stex.recv({
+        "type": "order",
         "txid": "1",
         "broker": "MAGENTA",
         "csid": "1",
@@ -33,6 +34,7 @@ if __name__ == "__main__":
         "volume": 1000,
     })
     stex.recv({
+        "type": "order",
         "txid": "2",
         "broker": "MAGENTA",
         "csid": "1",
@@ -42,6 +44,7 @@ if __name__ == "__main__":
         "volume": 1000,
     })
     stex.recv({
+        "type": "order",
         "txid": "3",
         "broker": "MAGENTA",
         "csid": "1",
@@ -51,6 +54,7 @@ if __name__ == "__main__":
         "volume": 500,
     })
     stex.recv({
+        "type": "order",
         "txid": "4",
         "broker": "MAGENTA",
         "csid": "1",
@@ -60,6 +64,7 @@ if __name__ == "__main__":
         "volume": 500,
     })
     stex.recv({
+        "type": "order",
         "txid": "5",
         "broker": "MAGENTA",
         "csid": "1",
@@ -69,6 +74,7 @@ if __name__ == "__main__":
         "volume": 1000,
     })
     stex.recv({
+        "type": "order",
         "txid": "6",
         "broker": "MAGENTA",
         "csid": "1",
@@ -78,6 +84,7 @@ if __name__ == "__main__":
         "volume": 1500,
     })
     stex.recv({
+        "type": "order",
         "txid": "7",
         "broker": "MAGENTA",
         "csid": "1",
@@ -87,6 +94,7 @@ if __name__ == "__main__":
         "volume": 500,
     })
     stex.recv({
+        "type": "order",
         "txid": "8",
         "broker": "MAGENTA",
         "csid": "1",
@@ -96,6 +104,7 @@ if __name__ == "__main__":
         "volume": 1000,
     })
     stex.recv({
+        "type": "order",
         "txid": "9",
         "broker": "MAGENTA",
         "csid": "1",
