@@ -159,6 +159,7 @@ def test_match_buy_with_insufficient_sell():
     ]
     sells = [
         model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=50, ts=1),
+        model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=1.0, volume=10, ts=1),
     ]
     trades = wrap_service_match_one(buys, sells)
     assert len(trades) == 0
