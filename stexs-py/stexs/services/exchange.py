@@ -66,7 +66,7 @@ class Exchange:
             raise e
 
         # Process order
-        buys, sells = orderbook.add_order(symbol, order)
+        buys, sells = orderbook.add_order(order)
         self.update_users(buys, sells)
 
         summary = orderbook.summarise_books(symbol)

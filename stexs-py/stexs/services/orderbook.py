@@ -5,7 +5,7 @@ import copy
 
 ORDER_UOW = iop.order.OrderMemoryUoW
 
-def add_order(symbol:str, order: model.Order):
+def add_order(order: model.Order, uow=ORDER_UOW):
     with ORDER_UOW() as uow:
         uow.orders.add(order)
         uow.commit()
