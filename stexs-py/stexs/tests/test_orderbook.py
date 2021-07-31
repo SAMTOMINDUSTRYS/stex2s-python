@@ -269,6 +269,35 @@ def test_summarise_empty_books():
     actual_summary = orderbook.summarise_books(buy_book, sell_book, buy=buy, sell=sell)
     assert expected_summary == actual_summary
 
+    with TEST_ORDER_UOW() as uow:
+        uow.orders._objects["STI."].clear()
+    actual_summary = orderbook.summarise_books_for_symbol("STI.", uow_cls=TEST_ORDER_UOW)
+    assert expected_summary == actual_summary
+
+
+def test_summarise_closed_books():
+    buy_book = [
+        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1, closed=True),
+    ]
+    sell_book = [
+        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1, closed=True),
+    ]
+    buy = 1
+    sell = 2
+
+    expected_summary = {
+        "dbuys": 0,
+        "dsells": 0,
+        "nbuys": 0,
+        "nsells": 0,
+        "vbuys": 0,
+        "vsells": 0,
+        "buy": 1,
+        "sell": 2
+    }
+    actual_summary = orderbook.summarise_books(buy_book, sell_book, buy=buy, sell=sell)
+    assert expected_summary == actual_summary
+
 
 def test_summarise_some_books():
     buy_book = [
