@@ -4,9 +4,10 @@ python:
 
 install:
   - pip install pytest sqlalchemy coverage
+  - python stexs-py/setup.py install
 
 script:
-  - coverage run --source='stexs/' -m pytest stexs/tests
+  - coverage run --source='stexs-py/' -m pytest stexs-py/stexs/tests
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
