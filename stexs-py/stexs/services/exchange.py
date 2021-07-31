@@ -22,6 +22,11 @@ class Exchange:
                 uow.commit()
                 self.stalls[stock.symbol] = model.MarketStall(stock=stock)
 
+    def list_stocks(self):
+        with self.stock_uow() as uow:
+            # Try out cached list
+            return uow.stocks.list()
+
     def add_broker(self, broker):
         self.brokers[broker.code] = broker
 

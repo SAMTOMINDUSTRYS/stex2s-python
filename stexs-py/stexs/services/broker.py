@@ -9,8 +9,11 @@ class Broker:
         # TODO Little hack for now
         self.code = code
         self.name = name
-        self.stock_uow = iop.stock.StockSqliteUoW
         self.user_uow = iop.user.MemoryClientUoW
+        self.exchange = None
+
+    def connect_exchange(self, exchange):
+        self.exchange = exchange
 
     def get_user(self, csid: str):
         with self.user_uow() as uow:
@@ -55,12 +58,9 @@ class Broker:
         log.info("[bold magenta]USER[/] [b]CASH[/] %s=%.3f" % (csid, user.balance))
 
     def adjust_holding(self, csid, symbol, adjust_qty):
-        with self.stock_uow() as uow:
-            # Try out cached list
-            stock_list = uow.stocks.list()
-            if not symbol in stock_list:
-                raise Exception("Unknown symbol")
-            stock = uow.stocks.get(symbol)
+        stock_list = self.exchange.list_stocks()
+        if not symbol in stock_list:
+            raise Exception("Unknown symbol")
 
         with self.user_uow() as uow:
             user = uow.users.get(csid)
