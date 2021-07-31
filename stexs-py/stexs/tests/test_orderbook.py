@@ -194,7 +194,7 @@ def test_execute_trade():
         model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     sells = [
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=150, ts=1),
+        model.Order(txid="2/2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=150, ts=1),
     ]
     wrap_service_add_orders(buys)
     wrap_service_add_orders(sells)
@@ -220,7 +220,8 @@ def test_execute_trade():
                 remaining_sell = None
                 for rsell in sell_book:
                     if '/' in rsell.txid:
-                        if rsell.txid.split('/')[0] == sell.txid:
+                        if rsell.txid.split('/')[0] == '2':
+                            assert rsell.txid == '2/3'
                             remaining_sell = rsell
 
                 assert remaining_sell is not None

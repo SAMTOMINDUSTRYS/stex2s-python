@@ -128,10 +128,11 @@ def execute_trade(trade: model.Trade, uow_cls=ORDER_UOW):
 
                 # Fiddle the txid so we know it is a split
                 if '/' in new_sell.txid:
-                    split_num = int(new_sell.txid.split('/')[1])+1
+                    parent, split = new_sell.txid.split('/')
+                    split_num = int(split)+1
+                    new_sell.txid = '%s/%d' % (parent, split_num)
                 else:
-                    split_num = 1
-                new_sell.txid += '/%d' % split_num
+                    new_sell.txid += '/1'
 
                 uow.orders.add(new_sell)
                 uow.commit()
