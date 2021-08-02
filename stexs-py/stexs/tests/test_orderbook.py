@@ -8,16 +8,16 @@ TEST_ORDER_UOW = iop.order.OrderMemoryUoW
 
 def wrap_service_add_orders(orders):
     for order in orders:
-        orderbook.add_order(order, uow_cls=TEST_ORDER_UOW)
+        orderbook.add_order(order, uow=TEST_ORDER_UOW())
 
 def wrap_service_close_txids(txids):
-    orderbook.close_txids(txids, uow_cls=TEST_ORDER_UOW)
+    orderbook.close_txids(txids, uow=TEST_ORDER_UOW())
 
 def wrap_service_match_one(buys, sells):
     return orderbook.match_one(buys, sells)
 
 def wrap_service_execute_trade(trade):
-    return orderbook.execute_trade(trade, uow_cls=TEST_ORDER_UOW)
+    return orderbook.execute_trade(trade, uow=TEST_ORDER_UOW())
 
 # Test add_order service (not the underlying persistence)
 def test_add_order():
@@ -209,7 +209,7 @@ def test_match_orderbook():
         model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=0.5, volume=100, ts=1),
     ]
     wrap_service_add_orders(orders)
-    actual_trade = orderbook.match_orderbook("STI.", uow_cls=TEST_ORDER_UOW)[0]
+    actual_trade = orderbook.match_orderbook("STI.", uow=TEST_ORDER_UOW())[0]
 
     assert expected_trade == actual_trade
 
@@ -271,7 +271,7 @@ def test_summarise_empty_books():
 
     with TEST_ORDER_UOW() as uow:
         uow.orders._objects["STI."].clear()
-    actual_summary = orderbook.summarise_books_for_symbol("STI.", uow_cls=TEST_ORDER_UOW)
+    actual_summary = orderbook.summarise_books_for_symbol("STI.", uow=TEST_ORDER_UOW())
     assert expected_summary == actual_summary
 
 
@@ -357,5 +357,5 @@ def test_summarise_some_books_for_symbol():
         "sell": 2
     }
 
-    actual_summary = orderbook.summarise_books_for_symbol("STI.", uow_cls=TEST_ORDER_UOW)
+    actual_summary = orderbook.summarise_books_for_symbol("STI.", uow=TEST_ORDER_UOW())
     assert expected_summary == actual_summary

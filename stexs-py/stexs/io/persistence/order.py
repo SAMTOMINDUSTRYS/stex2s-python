@@ -44,7 +44,8 @@ class OrderMemoryRepository(AbstractRepository):
             if txid in self._objects[symbol]:
                 if symbol not in self._staged_objects:
                     self._staged_objects[symbol] = {}
-                self._staged_objects[symbol][txid] = copy.deepcopy(self._objects[symbol][txid])
+                if txid not in self._staged_objects[symbol]:
+                    self._staged_objects[symbol][txid] = copy.deepcopy(self._objects[symbol][txid])
                 return self._staged_objects[symbol][txid]
         return None
 

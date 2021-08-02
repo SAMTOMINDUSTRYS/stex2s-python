@@ -4,10 +4,16 @@ import stexs.io.persistence as iop
 import copy
 from typing import List
 
+#TODO This should probably get injected somewhere but this works for now
 ORDER_UOW = iop.order.OrderMemoryUoW
 
-def add_order(order: model.Order, uow_cls=ORDER_UOW):
-    with uow_cls() as uow:
+def _default_uow():
+    return ORDER_UOW()
+
+def add_order(order: model.Order, uow=None):
+    if not uow:
+        uow = _default_uow()
+    with uow:
         uow.orders.add(order)
         uow.commit()
 
@@ -21,11 +27,16 @@ def add_order(order: model.Order, uow_cls=ORDER_UOW):
         return buys, sells
 
 #CRIT TODO Look up all txids at the same time
-def close_txids(txids: List[str], uow_cls=ORDER_UOW):
-    with uow_cls() as uow:
-        for txid in txids:
-            order = uow.orders.get(txid)
-            order.closed = True
+#TODO How to manage interfaces like this that allow for optional uow?
+def _close_txids(txids: List[str], uow):
+    for txid in txids:
+        order = uow.orders.get(txid)
+        order.closed = True
+def close_txids(txids: List[str], uow=None):
+    if not uow:
+        uow = _default_uow()
+    with uow:
+        _close_txids(txids, uow)
         uow.commit()
 
 def match_one(buy_book, sell_book):
@@ -100,12 +111,14 @@ def propose_trade(buy: model.Order, sells: List[model.Order], excess=0):
     )
 
 
-def execute_trade(trade: model.Trade, uow_cls=ORDER_UOW):
+def execute_trade(trade: model.Trade, uow=None):
+    if not uow:
+        uow = _default_uow()
 
-    with uow_cls() as uow:
+    with uow:
         # Close all transactions
-        #TODO Pass the uow from this scope in to join them together
-        close_txids([trade.buy_txid] + trade.sell_txids)
+        # Pass the uow from this scope to join the transactions together
+        _close_txids([trade.buy_txid] + trade.sell_txids, uow=uow)
 
         # Finally, if Sell volume exceeded requirement, split the final sell into a new Order
         if trade.excess > 0:
@@ -127,12 +140,12 @@ def execute_trade(trade: model.Trade, uow_cls=ORDER_UOW):
                     new_sell.txid += '/1'
 
                 uow.orders.add(new_sell)
-                uow.commit()
+        uow.commit()
 
     # TODO Persist the Trade itself
     trade.closed = True
 
-    with uow_cls() as uow:
+    with uow:
         confirmed_buys = [uow.orders.get(trade.buy_txid)]
         confirmed_sells = []
         for sell in trade.sell_txids:
@@ -181,8 +194,11 @@ def summarise_books(buy_book, sell_book, buy=None, sell=None):
         "sell": sell,
     }
 
-def summarise_books_for_symbol(symbol, uow_cls=ORDER_UOW):
-    with uow_cls() as uow:
+def summarise_books_for_symbol(symbol, uow=None):
+    if not uow:
+        uow = _default_uow()
+
+    with uow:
         buy_book = uow.orders.get_buy_book_for_symbol(symbol)
         sell_book = uow.orders.get_sell_book_for_symbol(symbol)
 
@@ -198,11 +214,13 @@ def summarise_books_for_symbol(symbol, uow_cls=ORDER_UOW):
 
         return summarise_books(buy_book, sell_book, buy=buy, sell=sell)
 
-def match_orderbook(symbol, uow_cls=ORDER_UOW):
+def match_orderbook(symbol, uow=None):
+    if not uow:
+        uow = _default_uow()
     # Trigger match process
     #       Will need to think about how this can be thread-safe if we move
     #       matching/trading to a separate thread from adding orders
-    with uow_cls() as uow:
+    with uow:
         buy_book = uow.orders.get_buy_book_for_symbol(symbol)
         sell_book = uow.orders.get_sell_book_for_symbol(symbol)
         return match_one(buy_book, sell_book)
