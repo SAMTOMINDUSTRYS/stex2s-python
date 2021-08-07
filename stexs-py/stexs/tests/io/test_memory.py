@@ -58,6 +58,12 @@ def test_memory_get(repo):
     assert repo.store._staged_versions[obj_id] == 8
 
 
+def test_memory_get_none(repo):
+    obj = repo.get('1')
+    assert obj is None
+    assert len(repo.store._staged_objects) == 0
+
+
 def test_memory_list(repo):
     _objects = {
         "hoot": {
@@ -105,6 +111,34 @@ def test_memory_commit(repo):
     # Check the obj itself
     assert repo.store._store._objects["hoot"]['1'] == obj
     assert repo.store._store._versions[obj_id] == 1
+
+
+def test_memory_concurrent_commit(repo):
+    obj_id = repo.get_obj_id('1')
+
+    _objects = {
+        "hoot": {
+            '1': StexRecord(stexid='1')
+        },
+    }
+    _versions = {
+        obj_id: 2
+    }
+
+    _staged_objects = {
+        obj_id: StexRecord(stexid='2')
+    }
+    _staged_versions = {
+        obj_id: 1
+    }
+
+    repo.store._store._objects = _objects
+    repo.store._store._versions = _versions
+    repo.store._staged_objects = _staged_objects
+    repo.store._staged_versions = _staged_versions
+
+    with pytest.raises(Exception, match="Concurrent commit rejected"):
+        repo._commit()
 
 
 def test_stage_clear(repo):
