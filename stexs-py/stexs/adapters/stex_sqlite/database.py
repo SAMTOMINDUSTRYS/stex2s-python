@@ -28,12 +28,6 @@ class StexSqliteSessionFactory():
 metadata = MetaData()
 mapper_registry = registry()
 
-stocks = Table(
-    'stocks', metadata,
-    Column('symbol', String, primary_key=True),
-    Column('name', String),
-)
-
-# Map Table to dataclass
-stocks_mapper = mapper_registry.map_imperatively(model.Stock, stocks)
-
+# Import tables for mapping
+# TODO No idea what the nice way to do this is?
+from . import stocks
