@@ -38,7 +38,7 @@ class Trade:
     sell_txids: List[str] = field(default_factory = List)
 
     @staticmethod
-    def propose_trade(filled_buy, filled_sells, excess):
+    def propose_trade(filled_buy: "Order", filled_sells: "Order", excess: int):
         # Calculate average price of fulfilled buy
         tot_price = 0
         sell_txids = []
@@ -77,7 +77,7 @@ class Order:
         return self.txid
 
     @staticmethod
-    def split_sell(filled_sell, excess_volume: int):
+    def split_sell(filled_sell: "Order", excess_volume: int):
 
         if filled_sell.side != "SELL":
             raise Exception("Cannot split non-sell.")
