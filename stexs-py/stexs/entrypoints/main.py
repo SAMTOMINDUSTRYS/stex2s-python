@@ -1,6 +1,11 @@
 from stexs.domain import model
 from stexs.services.exchange import Exchange
 from stexs.services.broker import Broker
+from stexs.services.logger import log
+import stexs.config as config
+
+import socket
+import json
 
 if __name__ == "__main__":
     stex = Exchange()
@@ -23,98 +28,20 @@ if __name__ == "__main__":
     broker.adjust_holding(csid="1", symbol="STI.", adjust_qty=+10000)
     broker.adjust_holding(csid="1", symbol="ELAN", adjust_qty=+10000)
 
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(config.get_socket_host_and_port())
+        log.debug("Listening: %s" % str(config.get_socket_host_and_port()))
+        s.listen()
 
+        while True:
+            conn, addr = s.accept()
+            with conn:
+                log.debug("Connection from %s" % str(addr))
+                while True:
+                    data = conn.recv(1024)
+                    if not data:
+                        break
 
-    stex.recv({
-        "type": "order",
-        "txid": "1",
-        "broker": "MAGENTA",
-        "csid": "1",
-        "side": "SELL",
-        "symbol": "STI.",
-        "price": 8.02,
-        "volume": 1000,
-    })
-    stex.recv({
-        "type": "order",
-        "txid": "2",
-        "broker": "MAGENTA",
-        "csid": "1",
-        "side": "SELL",
-        "symbol": "STI.",
-        "price": 8.02,
-        "volume": 1000,
-    })
-    stex.recv({
-        "type": "order",
-        "txid": "3",
-        "broker": "MAGENTA",
-        "csid": "1",
-        "side": "BUY",
-        "symbol": "STI.",
-        "price": 8.02,
-        "volume": 500,
-    })
-    stex.recv({
-        "type": "order",
-        "txid": "4",
-        "broker": "MAGENTA",
-        "csid": "1",
-        "side": "BUY",
-        "symbol": "STI.",
-        "price": 8.02,
-        "volume": 500,
-    })
-    stex.recv({
-        "type": "order",
-        "txid": "5",
-        "broker": "MAGENTA",
-        "csid": "1",
-        "side": "SELL",
-        "symbol": "STI.",
-        "price": 7.99,
-        "volume": 1000,
-    })
-    stex.recv({
-        "type": "order",
-        "txid": "6",
-        "broker": "MAGENTA",
-        "csid": "1",
-        "side": "BUY",
-        "symbol": "STI.",
-        "price": 8.03,
-        "volume": 1500,
-    })
-    stex.recv({
-        "type": "order",
-        "txid": "7",
-        "broker": "MAGENTA",
-        "csid": "1",
-        "side": "BUY",
-        "symbol": "STI.",
-        "price": 8.00,
-        "volume": 500,
-    })
-    stex.recv({
-        "type": "order",
-        "txid": "8",
-        "broker": "MAGENTA",
-        "csid": "1",
-        "side": "SELL",
-        "symbol": "ELAN",
-        "price": 4.10,
-        "volume": 1000,
-    })
-    stex.recv({
-        "type": "order",
-        "txid": "9",
-        "broker": "MAGENTA",
-        "csid": "1",
-        "side": "BUY",
-        "symbol": "ELAN",
-        "price": 4.10,
-        "volume": 500,
-    })
-
-    #stex.request_stall("STI.")
+                    payload = json.loads( data.decode("ascii") )
+                    stex.recv(payload)
 
