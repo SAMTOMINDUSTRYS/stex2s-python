@@ -8,7 +8,7 @@ install:
   - python stexs-py/setup.py install
 
 script:
-  - coverage run --source='stexs-py/' -m pytest stexs-py/stexs/tests
+  - coverage run --rcfile=stexs-py/stexs/tests/.coveragerc --source='stexs-py/' -m pytest stexs-py/stexs/tests
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
