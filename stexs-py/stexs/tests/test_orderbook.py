@@ -1,6 +1,11 @@
 import pytest
 import stexs.io.persistence as iop
 from stexs.domain import model
+from stexs.domain.order import (
+    Order,
+    SplitOrderBuyException,
+    SplitOrderVolumeException,
+)
 from stexs.services import orderbook
 
 # TODO Need to turn this into some sort of fixture that nukes the memory between tests
@@ -21,7 +26,7 @@ def wrap_service_execute_trade(trade):
 
 # Test add_order service (not the underlying persistence)
 def test_add_order():
-    expected_order = model.Order(
+    expected_order = Order(
         txid="1",
         csid="1",
         side="BUY",
@@ -51,9 +56,9 @@ def test_close_order():
 # TODO This needs to be done for each UoW as the sorting is done in the Repo...
 def test_buybook_ordered_by_maxprice_mintime():
     orders = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
-        model.Order(txid="2", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=2),
-        model.Order(txid="3", csid="1", side="BUY", symbol="STI.", price=2.0, volume=100, ts=3),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="2", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=2),
+        Order(txid="3", csid="1", side="BUY", symbol="STI.", price=2.0, volume=100, ts=3),
     ]
     wrap_service_add_orders(orders)
 
@@ -66,9 +71,9 @@ def test_buybook_ordered_by_maxprice_mintime():
 # TODO This needs to be done for each UoW as the sorting is done in the Repo...
 def test_sellbook_ordered_by_minprice_mintime():
     orders = [
-        model.Order(txid="1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=2),
-        model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=0.5, volume=100, ts=3),
+        Order(txid="1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=2),
+        Order(txid="3", csid="1", side="SELL", symbol="STI.", price=0.5, volume=100, ts=3),
     ]
     wrap_service_add_orders(orders)
 
@@ -80,7 +85,7 @@ def test_sellbook_ordered_by_minprice_mintime():
 
 def test_match_order_with_empty_buy_has_no_trades():
     orders = [
-        model.Order(txid="1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     trades = wrap_service_match_one([], orders)
     assert len(trades) == 0
@@ -88,7 +93,7 @@ def test_match_order_with_empty_buy_has_no_trades():
 
 def test_match_order_with_empty_sell_has_no_trades():
     orders = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     trades = wrap_service_match_one(orders, [])
     assert len(trades) == 0
@@ -96,10 +101,10 @@ def test_match_order_with_empty_sell_has_no_trades():
 
 def test_match_buy_with_perfect_sell():
     buys = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     sells = [
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     trades = wrap_service_match_one(buys, sells)
     assert len(trades) == 1
@@ -111,10 +116,10 @@ def test_match_buy_with_perfect_sell():
 
 def test_match_buy_with_excess_sell():
     buys = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     sells = [
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=1000, ts=1),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=1000, ts=1),
     ]
     trades = wrap_service_match_one(buys, sells)
     assert len(trades) == 1
@@ -125,13 +130,13 @@ def test_match_buy_with_excess_sell():
 
 def test_match_buy_with_multiple_sell():
     buys = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=1000, ts=1),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=1000, ts=1),
     ]
     sells = [
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=0.5, volume=500, ts=1),
-        model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=1.0, volume=250, ts=1),
-        model.Order(txid="4", csid="1", side="SELL", symbol="STI.", price=1.0, volume=300, ts=1),
-        model.Order(txid="5", csid="1", side="SELL", symbol="STI.", price=1.0, volume=1000, ts=1),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=0.5, volume=500, ts=1),
+        Order(txid="3", csid="1", side="SELL", symbol="STI.", price=1.0, volume=250, ts=1),
+        Order(txid="4", csid="1", side="SELL", symbol="STI.", price=1.0, volume=300, ts=1),
+        Order(txid="5", csid="1", side="SELL", symbol="STI.", price=1.0, volume=1000, ts=1),
     ]
     trades = wrap_service_match_one(buys, sells)
     assert len(trades) == 1
@@ -144,10 +149,10 @@ def test_match_buy_with_multiple_sell():
 
 def test_match_buy_with_overpriced_sell():
     buys = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     sells = [
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=2.0, volume=500, ts=1),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=2.0, volume=500, ts=1),
     ]
     trades = wrap_service_match_one(buys, sells)
     assert len(trades) == 0
@@ -155,11 +160,11 @@ def test_match_buy_with_overpriced_sell():
 
 def test_match_buy_with_insufficient_sell():
     buys = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     sells = [
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=50, ts=1),
-        model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=1.0, volume=10, ts=1),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=50, ts=1),
+        Order(txid="3", csid="1", side="SELL", symbol="STI.", price=1.0, volume=10, ts=1),
     ]
     trades = wrap_service_match_one(buys, sells)
     assert len(trades) == 0
@@ -167,10 +172,10 @@ def test_match_buy_with_insufficient_sell():
 
 def test_match_aborts_on_closed_buy():
     buys = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1, closed=True),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1, closed=True),
     ]
     sells = [
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     trades = wrap_service_match_one(buys, sells)
     assert len(trades) == 0
@@ -178,11 +183,11 @@ def test_match_aborts_on_closed_buy():
 
 def test_match_skips_on_closed_sell():
     buys = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     sells = [
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1, closed=True),
-        model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1, closed=True),
+        Order(txid="3", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     trades = wrap_service_match_one(buys, sells)
     assert len(trades) == 1
@@ -203,10 +208,10 @@ def test_match_orderbook():
     )
 
     orders = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=0.5, volume=200, ts=1),
-        model.Order(txid="4", csid="1", side="BUY", symbol="STI.", price=1.0, volume=200, ts=1),
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
-        model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=0.5, volume=100, ts=1),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=0.5, volume=200, ts=1),
+        Order(txid="4", csid="1", side="BUY", symbol="STI.", price=1.0, volume=200, ts=1),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="3", csid="1", side="SELL", symbol="STI.", price=0.5, volume=100, ts=1),
     ]
     wrap_service_add_orders(orders)
     actual_trade = orderbook.match_orderbook("STI.", uow=TEST_ORDER_UOW())[0]
@@ -215,7 +220,7 @@ def test_match_orderbook():
 
 
 def test_split_sell():
-    order = model.Order(txid="1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1)
+    order = Order(txid="1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1)
     order, remainder = orderbook.split_sell(order, 25)
 
     assert order.txid == "1"
@@ -227,7 +232,7 @@ def test_split_sell():
 
 
 def test_split_split_sell():
-    order = model.Order(txid="1/1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1)
+    order = Order(txid="1/1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1)
     order, remainder = orderbook.split_sell(order, 25)
 
     assert order.txid == "1/1"
@@ -240,22 +245,22 @@ def test_split_split_sell():
 
 def test_bad_split_big_volume():
     for bad_vol in [100, 101, 1000]:
-        order = model.Order(txid="1/1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1)
+        order = Order(txid="1/1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1)
 
-        with pytest.raises(Exception, match="Cannot split sell for same or greater volume."):
+        with pytest.raises(SplitOrderVolumeException, match="Cannot split sell for same or greater volume."):
             order, remainder = orderbook.split_sell(order, bad_vol)
 
 def test_bad_split_small_volume():
     for bad_vol in [0, -1, -100]:
-        order = model.Order(txid="1/1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1)
+        order = Order(txid="1/1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1)
 
-        with pytest.raises(Exception, match="Cannot split sell without excess volume."):
+        with pytest.raises(SplitOrderVolumeException, match="Cannot split sell without excess volume."):
             order, remainder = orderbook.split_sell(order, bad_vol)
 
 def test_bad_split_buy():
-    order = model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1)
+    order = Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1)
 
-    with pytest.raises(Exception, match="Cannot split non-sell."):
+    with pytest.raises(SplitOrderBuyException, match="Cannot split non-sell."):
         order, remainder = orderbook.split_sell(order, 50)
 
 
@@ -264,10 +269,10 @@ def test_execute_trade():
         uow.orders._objects.clear()
 
     buys = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     sells = [
-        model.Order(txid="2/2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=150, ts=1),
+        Order(txid="2/2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=150, ts=1),
     ]
     wrap_service_add_orders(buys)
     wrap_service_add_orders(sells)
@@ -321,10 +326,10 @@ def test_summarise_empty_books():
 
 def test_summarise_closed_books():
     buy_book = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1, closed=True),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1, closed=True),
     ]
     sell_book = [
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1, closed=True),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1, closed=True),
     ]
     buy = 1
     sell = 2
@@ -345,14 +350,14 @@ def test_summarise_closed_books():
 
 def test_summarise_some_books():
     buy_book = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
-        model.Order(txid="6", csid="1", side="BUY", symbol="STI.", price=1.0, volume=300, ts=1),
-        model.Order(txid="4", csid="1", side="BUY", symbol="STI.", price=0.9, volume=100, ts=1),
-        model.Order(txid="5", csid="1", side="BUY", symbol="STI.", price=0.9, volume=100, ts=1),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="6", csid="1", side="BUY", symbol="STI.", price=1.0, volume=300, ts=1),
+        Order(txid="4", csid="1", side="BUY", symbol="STI.", price=0.9, volume=100, ts=1),
+        Order(txid="5", csid="1", side="BUY", symbol="STI.", price=0.9, volume=100, ts=1),
     ]
     sell_book = [
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
-        model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
+        Order(txid="3", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
     ]
     buy = 1
     sell = 2
@@ -378,14 +383,14 @@ def test_summarise_some_books_for_symbol():
         uow.orders._objects.clear()
 
     buy_book = [
-        model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
-        model.Order(txid="6", csid="1", side="BUY", symbol="STI.", price=1.0, volume=300, ts=1),
-        model.Order(txid="4", csid="1", side="BUY", symbol="STI.", price=0.9, volume=100, ts=1),
-        model.Order(txid="5", csid="1", side="BUY", symbol="STI.", price=0.9, volume=100, ts=1),
+        Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
+        Order(txid="6", csid="1", side="BUY", symbol="STI.", price=1.0, volume=300, ts=1),
+        Order(txid="4", csid="1", side="BUY", symbol="STI.", price=0.9, volume=100, ts=1),
+        Order(txid="5", csid="1", side="BUY", symbol="STI.", price=0.9, volume=100, ts=1),
     ]
     sell_book = [
-        model.Order(txid="2", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
-        model.Order(txid="3", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
+        Order(txid="3", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
     ]
     wrap_service_add_orders(buy_book)
     wrap_service_add_orders(sell_book)

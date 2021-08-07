@@ -1,4 +1,5 @@
 from stexs.domain import model
+from stexs.domain.order import Order
 from stexs.services.logger import log
 from stexs.services import orderbook
 import stexs.io.persistence as iop
@@ -42,7 +43,7 @@ class Exchange:
         if not user:
             raise Exception("Unknown user")
 
-        order = model.Order(
+        order = Order(
             txid=msg["txid"],
             csid=msg["csid"],
             side=msg["side"],

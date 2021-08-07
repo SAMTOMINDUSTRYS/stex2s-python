@@ -1,6 +1,6 @@
 import copy
 from stexs.io.persistence.base import AbstractUoW, AbstractRepository
-from stexs.domain import model
+from stexs.domain.order import Order
 from stexs.services.logger import log
 
 # Stolen from Base but thats ok, we can modify this to a different path
@@ -22,7 +22,7 @@ class OrderMemoryRepository(AbstractRepository):
         self._staged_objects = {}
         self._staged_versions = {}
 
-    def add(self, order: model.Order):
+    def add(self, order: Order):
         if order.symbol not in self._staged_objects:
             self._staged_objects[order.symbol] = {}
         self._staged_objects[order.symbol][order.txid] = order

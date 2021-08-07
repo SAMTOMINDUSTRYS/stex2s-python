@@ -1,4 +1,5 @@
 from stexs.domain import model
+from stexs.domain.order import Order
 from stexs.services.logger import log
 import stexs.io.persistence as iop
 import copy
@@ -11,7 +12,7 @@ ORDER_UOW = iop.order.OrderMemoryUoW
 def _default_uow():
     return ORDER_UOW()
 
-def add_order(order: model.Order, uow=None):
+def add_order(order: Order, uow=None):
     if not uow:
         uow = _default_uow()
     with uow:
@@ -88,12 +89,12 @@ def match_one(buy_book, sell_book):
     return proposed_trades
 
 
-def propose_trade(buy: model.Order, sells: List[model.Order], excess=0):
+def propose_trade(buy: Order, sells: List[Order], excess=0):
     return model.Trade.propose_trade(buy, sells, excess)
 
 
-def split_sell(filled_sell: model.Order, excess_volume: int, uow=None):
-    filled_sell, remainder_sell = model.Order.split_sell(filled_sell, excess_volume)
+def split_sell(filled_sell: Order, excess_volume: int, uow=None):
+    filled_sell, remainder_sell = Order.split_sell(filled_sell, excess_volume)
     return filled_sell, remainder_sell
 
 
