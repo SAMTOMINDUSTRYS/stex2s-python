@@ -1,10 +1,10 @@
 import copy
-from stexs.io.persistence.base import AbstractUoW, AbstractRepository
-from stexs.domain.order import Order
+from stexs.io.persistence.base import AbstractUoW
+from stexs.domain.order import Order, OrderRepository
 from stexs.services.logger import log
 
 # Stolen from Base but thats ok, we can modify this to a different path
-class OrderMemoryRepository(AbstractRepository):
+class OrderMemoryRepository(OrderRepository):
     # TODO This seems to act more like a UoW than the UoW does !
     # CRIT TODO The refs to self._object only happen to work as the struct id is shared
     #           but should use GenericMemoryRepository._objects to prevent shadowing
