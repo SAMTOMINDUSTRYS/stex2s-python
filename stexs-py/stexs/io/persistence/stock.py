@@ -8,9 +8,6 @@ class MemoryStockUoW(AbstractUoW):
         super().__init__(*args, **kwargs)
         self.stocks = GenericMemoryRepository(prefix="stocks")
 
-    def list(self):
-        return self.stocks.list()
-
     def commit(self):
         for stock_id, version in self.stocks.store._staged_versions.items():
             if version == 0:

@@ -6,6 +6,20 @@ import stexs.io.persistence as iop
 from typing import List, Dict
 import time
 
+#TODO This should probably get injected somewhere but this works for now
+STOCK_UOW = iop.stock.MemoryStockUoW
+
+def _default_stock_uow():
+    return STOCK_UOW()
+
+def add_stock(stock: model.Stock, uow=None):
+    if not uow:
+        uow = _default_stock_uow()
+    with uow:
+        uow.stocks.add(stock)
+        uow.commit()
+
+
 class Exchange:
 
     def __init__(self, *args, **kwargs):
@@ -14,14 +28,12 @@ class Exchange:
         self.brokers = {}
 
         # TODO Little hack for now
-        self.stock_uow = iop.stock.MemoryStockUoW
+        self.stock_uow = _default_stock_uow
 
     def add_stocks(self, stocks: List[model.Stock]):
-        with self.stock_uow() as uow:
-            for stock in stocks:
-                uow.stocks.add(stock)
-                uow.commit()
-                self.stalls[stock.symbol] = model.MarketStall(stock=stock)
+        for stock in stocks:
+            add_stock(stock)
+            self.stalls[stock.symbol] = model.MarketStall(stock=stock)
 
     def list_stocks(self):
         with self.stock_uow() as uow:

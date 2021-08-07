@@ -3,8 +3,6 @@ import stexs.io.persistence as iop
 from stexs.domain import model
 from stexs.domain.order import (
     Order,
-    SplitOrderBuyException,
-    SplitOrderVolumeException,
 )
 from stexs.services import orderbook
 
