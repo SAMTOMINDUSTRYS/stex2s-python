@@ -37,6 +37,30 @@ class Trade:
     excess: int = 0 # TODO CRIT Cheeky way of keeping size of excess last sell
     sell_txids: List[str] = field(default_factory = List)
 
+    @staticmethod
+    def propose_trade(filled_buy, filled_sells, excess):
+        # Calculate average price of fulfilled buy
+        tot_price = 0
+        sell_txids = []
+        for i_sell, sell in enumerate(filled_sells):
+            sell_txids.append(sell.txid)
+
+            if i_sell == len(filled_sells)-1:
+                tot_price += (sell.price * (sell.volume - excess))
+            else:
+                tot_price += (sell.price * sell.volume)
+
+        return Trade(
+            symbol=filled_buy.symbol,
+            volume=filled_buy.volume,
+            buy_txid=filled_buy.txid,
+            sell_txids=sell_txids,
+            avg_price=tot_price/filled_buy.volume,
+            total_price=tot_price,
+            excess=excess,
+            closed=False,
+        )
+
 @dataclass
 class Order:
     txid: str

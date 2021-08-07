@@ -89,27 +89,7 @@ def match_one(buy_book, sell_book):
 
 
 def propose_trade(buy: model.Order, sells: List[model.Order], excess=0):
-    # Calculate average price of fulfilled buy
-    tot_price = 0
-    sell_txids = []
-    for i_sell, sell in enumerate(sells):
-        sell_txids.append(sell.txid)
-
-        if i_sell == len(sells)-1:
-            tot_price += (sell.price * (sell.volume - excess))
-        else:
-            tot_price += (sell.price * sell.volume)
-
-    return model.Trade(
-        symbol=buy.symbol,
-        volume=buy.volume,
-        buy_txid=buy.txid,
-        sell_txids=sell_txids,
-        avg_price=tot_price/buy.volume,
-        total_price=tot_price,
-        excess=excess,
-        closed=False,
-    )
+    return model.Trade.propose_trade(buy, sells, excess)
 
 
 def split_sell(filled_sell: model.Order, excess_volume: int, uow=None):
