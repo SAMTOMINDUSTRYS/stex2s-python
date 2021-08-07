@@ -6,14 +6,17 @@ import time
 class MemoryStockUoW(AbstractUoW):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.stocks = GenericMemoryRepository(prefix="stocks", stexid="symbol")
+        self.stocks = GenericMemoryRepository(prefix="stocks")
+
+    def list(self):
+        return self.stocks.list()
 
     def commit(self):
-        self.stocks._commit()
-        for symbol, stock in self.stocks._staged_objects.items():
-            if self.stocks._versions[symbol] == 1:
+        for stock_id, version in self.stocks.store._staged_versions.items():
+            if version == 0:
+                stock = self.stocks.store._staged_objects[stock_id]
                 log.info("[bold red]MRKT[/] Listed [b]%s[/] %s" % (stock.symbol, stock.name))
-        self.committed = True
+        self.stocks._commit()
 
     def rollback(self):
         pass

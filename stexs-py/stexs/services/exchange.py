@@ -14,7 +14,7 @@ class Exchange:
         self.brokers = {}
 
         # TODO Little hack for now
-        self.stock_uow = iop.stock.StockSqliteUoW
+        self.stock_uow = iop.stock.MemoryStockUoW
 
     def add_stocks(self, stocks: List[model.Stock]):
         with self.stock_uow() as uow:

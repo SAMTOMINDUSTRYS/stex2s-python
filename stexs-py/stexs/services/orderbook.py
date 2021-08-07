@@ -38,6 +38,7 @@ def close_txids(txids: List[str], uow=None):
     if not uow:
         uow = _default_uow()
     with uow:
+        log.info(txids)
         _close_txids(txids, uow)
         uow.commit()
 

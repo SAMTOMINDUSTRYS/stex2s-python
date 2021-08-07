@@ -12,6 +12,8 @@ from stexs.services import orderbook
 TEST_ORDER_UOW = iop.order.OrderMemoryUoW
 
 def wrap_service_add_orders(orders):
+    with TEST_ORDER_UOW() as uow:
+        uow.orders.clear()
     for order in orders:
         orderbook.add_order(order, uow=TEST_ORDER_UOW())
 
@@ -197,6 +199,7 @@ def test_match_skips_on_closed_sell():
 # Test the match_orderbook process returns a Trade matching expectations
 # Not necessarily testing the matcher itself
 def test_match_orderbook():
+
     expected_trade = model.Trade(
         symbol="STI.",
         buy_txid="4",
@@ -233,17 +236,13 @@ def test_split_sell():
 
 
 def test_execute_trade():
-    with TEST_ORDER_UOW() as uow:
-        uow.orders._objects.clear()
-
     buys = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
     ]
     sells = [
         Order(txid="2/2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=150, ts=1),
     ]
-    wrap_service_add_orders(buys)
-    wrap_service_add_orders(sells)
+    wrap_service_add_orders(buys + sells)
     trade = wrap_service_match_one(buys, sells)[0]
 
     confirmed_buys, confirmed_sells = wrap_service_execute_trade(trade)
@@ -287,7 +286,7 @@ def test_summarise_empty_books():
     assert expected_summary == actual_summary
 
     with TEST_ORDER_UOW() as uow:
-        uow.orders._objects["STI."].clear()
+        uow.orders.clear()
     actual_summary = orderbook.summarise_books_for_symbol("STI.", uow=TEST_ORDER_UOW())
     assert expected_summary == actual_summary
 
@@ -347,9 +346,6 @@ def test_summarise_some_books():
 # Test the summarise_books_for_symbol returns a summary as expected
 # Not necessarily testing the summarise_books itself
 def test_summarise_some_books_for_symbol():
-    with TEST_ORDER_UOW() as uow:
-        uow.orders._objects.clear()
-
     buy_book = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
         Order(txid="6", csid="1", side="BUY", symbol="STI.", price=1.0, volume=300, ts=1),
@@ -360,8 +356,7 @@ def test_summarise_some_books_for_symbol():
         Order(txid="2", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
         Order(txid="3", csid="1", side="SELL", symbol="STI.", price=2.0, volume=100, ts=1),
     ]
-    wrap_service_add_orders(buy_book)
-    wrap_service_add_orders(sell_book)
+    wrap_service_add_orders(buy_book + sell_book)
 
     expected_summary = {
         "dbuys": 4,

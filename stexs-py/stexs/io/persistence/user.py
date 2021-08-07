@@ -8,11 +8,11 @@ class MemoryClientUoW(AbstractUoW):
         self.users = GenericMemoryRepository(prefix="clients")
 
     def commit(self):
-        self.users._commit()
-        for user_id, user in self.users._objects.items():
-            if self.users._versions[user_id] == 1:
+        for user_id, version in self.users.store._staged_versions.items():
+            if version == 0:
+                user = self.users.store._staged_objects[user_id]
                 log.info("[bold red]USER[/] Registered [b]%s[/] %s" % (user.csid, user.name))
-        self.committed = True
+        self.users._commit()
 
     def rollback(self):
         pass

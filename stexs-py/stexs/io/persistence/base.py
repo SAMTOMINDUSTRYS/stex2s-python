@@ -37,60 +37,147 @@ class AbstractUoW(abc.ABC):
         raise NotImplementedError
 
 ###############################################################################
+from stexs.services.logger import log
 
-class GenericMemoryRepository(AbstractRepository):
-    # TODO This seems to act more like a UoW than the UoW does !
-    # CRIT TODO The refs to self._object only happen to work as the struct id is shared
-    #           but should use GenericMemoryRepository._objects to prevent shadowing
+class GenericVersionedMemoryDict():
 
-    # Class variable allows us to mock a crap memory DB
-    # as values will persist across instances of MemoryClientRepository
-    _objects = {}
+    def __init__(self, *args, **kwargs):
+        self._objects = {}
 
-    # Keep tabs on object version checked out by `get` and ensure it is matched
-    # when committing as a means to detect concurrent commits, effectively provides
-    # compare-and-set (could still be caught in a race condition)
-    _versions = {}
+        # Keep tabs on object version checked out by `get` and ensure it is matched
+        # when committing as a means to detect concurrent commits, effectively provides
+        # compare-and-set (could still be caught in a race condition)
+        self._versions = {}
 
-    def __init__(self, prefix, *args, **kwargs):
-        # Prefix will avoid clashes between _objects with the same IDs across
-        # different namespaces. ie. Everything using the GenericMemoryRepository is
-        # using the same _objects dictionary. This will not be particularly
-        # pretty but will work for now!
-        self.prefix = prefix
-        self._staged_objects = {}
-        self._staged_versions = {}
+    def _xget(self, key_path):
+        node = self._objects
+        for key in key_path.split('>'):
+            node = node.get(key)
+            if node is None:
+                 return {}
+        return node
 
-    def get_obj_id(self, obj_id):
-        return "%s-%s" % (self.prefix, obj_id)
-
-    def add(self, obj):
-        obj_id = self.get_obj_id(obj.stexid)
-        self._staged_objects[obj_id] = obj
-
-    def get(self, obj_id: str):
-        obj_id = self.get_obj_id(obj_id)
-
+    def _get(self, key_path):
         # Providing read committed isolation as only committed data can be
         # read from _objects and _staged_objects cannot be read by other UoW
         # Does not guard against read skew and the like...
-        self._staged_objects[obj_id] = copy.deepcopy(self._objects.get(obj_id))
-        self._staged_versions[obj_id] = self._versions[obj_id]
-        return self._staged_objects[obj_id]
+        if key_path not in self._versions:
+            return None, None
+
+        node = self._xget(key_path)
+        return node, self._versions[key_path]
+
+    def _add(self, key_path, obj):
+        node = self._objects
+        path = key_path.split('>')
+        for i, key in enumerate(path):
+            if i == len(path)-1:
+                # Insert / update
+                node[key] = obj
+            else:
+                if key not in node:
+                    node[key] = {}
+                node = node[key]
+
+    def _check(self, key_path):
+        node = self._objects
+        for key in key_path.split('>'):
+            node = node.get(key)
+            if not node:
+                 break
+        return node is not None
+
+class GenericVersionedMemoryDictWrapper():
+
+    def __init__(self, *args, **kwargs):
+        self._store = GenericVersionedMemoryDict()
+        self._staged_objects = {}
+        self._staged_versions = {}
+
+    def _check(self, key_path):
+        return self._store._check(key_path)
+
+    def _add(self, key_path, obj):
+        if key_path not in self._staged_objects:
+            self._staged_versions[key_path] = 0
+        self._staged_objects[key_path] = obj
+
+    def _get(self, key_path):
+        # Providing read committed isolation as only committed data can be
+        # read from _objects and _staged_objects cannot be read by other UoW
+        # Does not guard against read skew and the like...
+        if key_path in self._staged_objects:
+            return self._staged_objects[key_path]
+        else:
+            obj, version = self._store._get(key_path)
+
+            if obj:
+                # Copy object to _staged_objects
+                self._staged_objects[key_path] = copy.deepcopy(obj)
+
+                # Cache checked-out version
+                self._staged_versions[key_path] = version
+
+                return self._staged_objects[key_path]
+
+    def _list(self, key_path):
+        return self._store._xget(key_path).keys()
 
     def _commit(self):
-        for obj_id, obj in self._staged_objects.items():
-            if not self._objects.get(obj_id):
-                self._versions[obj_id] = 0
+        commits = {}
+
+        for obj_key_path, obj in self._staged_objects.items():
+            if not self._check(obj_key_path):
+                # New
+                self._store._versions[obj_key_path] = 0
             else:
-                if self._versions[obj_id] != self._staged_versions[obj_id]:
+                # Check version for concurrent transaction
+                if self._store._versions[obj_key_path] != self._staged_versions[obj_key_path]:
                     raise Exception("Concurrent commit rejected")
-            self._objects[obj_id] = obj
-            self._versions[obj_id] += 1
+
+            # Commit to store and increment version
+            self._store._add(obj_key_path, obj)
+            self._store._versions[obj_key_path] += 1
+
+            commits[obj_key_path] = self._store._versions[obj_key_path]
 
         # Reset staged objects?
         # CRIT TODO Could break commit - edit - commit workflow
-        self._staged_objects = {}
+        self.clear()
+
+        return commits
+
+    def clear(self):
+        self._staged_objects.clear()
+        self._staged_versions.clear()
+
+    def _clear(self):
+        self._store._objects.clear()
+        self._store._versions.clear()
+
+
+class GenericMemoryRepository(AbstractRepository):
+    store = GenericVersionedMemoryDictWrapper()
+
+    def __init__(self, prefix, *args, **kwargs):
+        self.prefix = prefix
+
+    def get_obj_id(self, obj_id):
+        return "%s>%s" % (self.prefix, obj_id)
+
+    def add(self, obj):
+        obj_id = self.get_obj_id(obj.stexid)
+        self.store._add(obj_id, obj)
+
+    def get(self, obj_id: str):
+        obj_id = self.get_obj_id(obj_id)
+        return self.store._get(obj_id)
+
+    def list(self):
+        return self.store._list(self.prefix)
+
+    def _commit(self):
+        self.store._commit()
 
 
 ###############################################################################
