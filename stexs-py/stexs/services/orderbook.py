@@ -2,6 +2,7 @@ from stexs.domain import model
 from stexs.services.logger import log
 import stexs.io.persistence as iop
 import copy
+import dataclasses
 from typing import List
 
 #TODO This should probably get injected somewhere but this works for now
@@ -111,6 +112,28 @@ def propose_trade(buy: model.Order, sells: List[model.Order], excess=0):
     )
 
 
+def split_sell(filled_sell: model.Order, excess_volume: int, uow=None):
+
+    if excess_volume >= filled_sell.volume:
+        raise Exception("Cannot split sell for same or greater volume.")
+    if excess_volume <= 0:
+        raise Exception("Cannot split sell without excess volume.")
+
+    filled_sell.volume -= excess_volume
+
+    # Fiddle the txid so we know it is a split
+    if '/' in filled_sell.txid:
+        parent, split = filled_sell.txid.split('/')
+        split_num = int(split)+1
+    else:
+        parent = filled_sell.txid
+        split_num = 1
+    new_txid = '%s/%d' % (parent, split_num)
+
+    remainder_sell = dataclasses.replace(filled_sell, txid=new_txid, volume=excess_volume, closed=False)
+    return filled_sell, remainder_sell
+
+
 def execute_trade(trade: model.Trade, uow=None):
     if not uow:
         uow = _default_uow()
@@ -122,24 +145,9 @@ def execute_trade(trade: model.Trade, uow=None):
 
         # Finally, if Sell volume exceeded requirement, split the final sell into a new Order
         if trade.excess > 0:
-
-                last_sell = uow.orders.get(trade.sell_txids[-1])
-                last_sell.volume -= trade.excess
-
-                # new_sell.ts does not get updated
-                new_sell = copy.copy(last_sell)
-                new_sell.closed = False
-                new_sell.volume = trade.excess
-
-                # Fiddle the txid so we know it is a split
-                if '/' in new_sell.txid:
-                    parent, split = new_sell.txid.split('/')
-                    split_num = int(split)+1
-                    new_sell.txid = '%s/%d' % (parent, split_num)
-                else:
-                    new_sell.txid += '/1'
-
-                uow.orders.add(new_sell)
+            last_sell = uow.orders.get(trade.sell_txids[-1])
+            filled_sell, remainder_sell = split_sell(last_sell, trade.excess)
+            uow.orders.add(remainder_sell)
         uow.commit()
 
     # TODO Persist the Trade itself
