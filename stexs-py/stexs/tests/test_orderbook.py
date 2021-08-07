@@ -252,6 +252,12 @@ def test_bad_split_small_volume():
         with pytest.raises(Exception, match="Cannot split sell without excess volume."):
             order, remainder = orderbook.split_sell(order, bad_vol)
 
+def test_bad_split_buy():
+    order = model.Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1)
+
+    with pytest.raises(Exception, match="Cannot split non-sell."):
+        order, remainder = orderbook.split_sell(order, 50)
+
 
 def test_execute_trade():
     with TEST_ORDER_UOW() as uow:

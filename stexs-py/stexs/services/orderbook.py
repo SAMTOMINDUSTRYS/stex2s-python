@@ -113,24 +113,7 @@ def propose_trade(buy: model.Order, sells: List[model.Order], excess=0):
 
 
 def split_sell(filled_sell: model.Order, excess_volume: int, uow=None):
-
-    if excess_volume >= filled_sell.volume:
-        raise Exception("Cannot split sell for same or greater volume.")
-    if excess_volume <= 0:
-        raise Exception("Cannot split sell without excess volume.")
-
-    filled_sell.volume -= excess_volume
-
-    # Fiddle the txid so we know it is a split
-    if '/' in filled_sell.txid:
-        parent, split = filled_sell.txid.split('/')
-        split_num = int(split)+1
-    else:
-        parent = filled_sell.txid
-        split_num = 1
-    new_txid = '%s/%d' % (parent, split_num)
-
-    remainder_sell = dataclasses.replace(filled_sell, txid=new_txid, volume=excess_volume, closed=False)
+    filled_sell, remainder_sell = model.Order.split_sell(filled_sell, excess_volume)
     return filled_sell, remainder_sell
 
 
