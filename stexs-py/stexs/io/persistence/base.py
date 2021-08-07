@@ -174,7 +174,7 @@ class GenericMemoryRepository(AbstractRepository):
         return self.store._get(obj_id)
 
     def list(self):
-        return self.store._list(self.prefix)
+        return set(self.store._list(self.prefix))
 
     def _commit(self):
         self.store._commit()
