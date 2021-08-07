@@ -17,6 +17,7 @@ class Order:
     def stexid(self):
         return self.txid
 
+    # TODO I guess this doesn't need to be static and we can just call it ON the order to split
     @staticmethod
     def split_sell(filled_sell: "Order", excess_volume: int):
 
