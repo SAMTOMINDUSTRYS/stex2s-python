@@ -18,3 +18,4 @@ def test_add_stock():
 
     assert actual_stock is not None
     assert expected_stock == actual_stock
+

@@ -55,7 +55,7 @@ class Trade:
             volume=filled_buy.volume,
             buy_txid=filled_buy.txid,
             sell_txids=sell_txids,
-            avg_price=tot_price/filled_buy.volume,
+            avg_price=tot_price/filled_buy.volume, # TODO Think this needs to buy at max buy, not buy at min sell
             total_price=tot_price,
             excess=excess,
             closed=False,
