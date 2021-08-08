@@ -5,6 +5,7 @@ from stexs.services import orderbook
 import stexs.io.persistence as iop
 from typing import List, Dict
 import time
+from dataclasses import asdict as dataclasses_asdict
 
 #TODO This should probably get injected somewhere but this works for now
 STOCK_UOW = iop.stock.MemoryStockUoW
@@ -19,6 +20,12 @@ def add_stock(stock: model.Stock, uow=None):
         uow.stocks.add(stock)
         uow.commit()
 
+def list_stocks(uow=None):
+    if not uow:
+        uow = _default_stock_uow()
+    with uow:
+        return uow.stocks.list()
+
 
 class Exchange:
 
@@ -32,13 +39,11 @@ class Exchange:
 
     def add_stocks(self, stocks: List[model.Stock]):
         for stock in stocks:
-            add_stock(stock)
+            add_stock(stock, uow=self.stock_uow())
             self.stalls[stock.symbol] = model.MarketStall(stock=stock)
 
     def list_stocks(self):
-        with self.stock_uow() as uow:
-            # Try out cached list
-            return uow.stocks.list()
+        return list_stocks(uow=self.stock_uow())
 
     def add_broker(self, broker):
         self.brokers[broker.code] = broker
@@ -102,16 +107,25 @@ class Exchange:
             summary = orderbook.summarise_books_for_symbol(symbol)
             log.info("[bold green]BOOK[/] [b]%s[/] %s" % (symbol, str(summary)))
 
+        return {
+            "order": dataclasses_asdict(order),
+        }
+
 
     def clear_trade(self):
         pass
 
     def recv(self, msg):
         if msg["txid"] in self.txid_set:
-            raise Exception("Duplicate transaction")
+            reply = {
+                "type": "exception",
+                "msg": "duplicate transaction",
+            }
 
         if msg["type"] == "order":
-            self.handle_order(msg)
+            reply = self.handle_order(msg)
 
         # Idempotent txid
         self.txid_set.add(msg["txid"])
+
+        return reply
