@@ -43,5 +43,8 @@ if __name__ == "__main__":
                         break
 
                     payload = json.loads( data.decode("ascii") )
-                    stex.recv(payload)
+                    reply = stex.recv(payload)
+
+                    payload = json.dumps(reply).encode("ascii")
+                    conn.send(payload)
 

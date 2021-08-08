@@ -23,6 +23,13 @@ if __name__ == "__main__":
                     }).encode('ascii'))
                 except Exception as e:
                     print(e)
+
+                data = client.recv(4096)
+                if not data:
+                    break
+                payload = json.loads( data.decode("ascii") )
+                print(payload)
+
             client.shutdown(1)
             client.close()
             txid += 1
