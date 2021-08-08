@@ -198,25 +198,18 @@ def test_match_skips_on_closed_sell():
 # Not necessarily testing the matcher itself
 def test_match_orderbook():
 
-    expected_trade = model.Trade(
-        symbol="STI.",
-        buy_txid="4",
-        sell_txids=["3", "2"],
-        volume=200,
-        avg_price=0.75,
-        total_price=150,
-        closed=False,
-    )
-
     orders = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=0.5, volume=200, ts=1),
         Order(txid="4", csid="1", side="BUY", symbol="STI.", price=1.0, volume=200, ts=1),
         Order(txid="2", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
         Order(txid="3", csid="1", side="SELL", symbol="STI.", price=0.5, volume=100, ts=1),
     ]
+    expected_trade = model.Trade.propose_trade(orders[1], [orders[3], orders[2]], excess=0)
+
     wrap_service_add_orders(orders)
     actual_trade = orderbook.match_orderbook("STI.", uow=TEST_ORDER_UOW())[0]
 
+    actual_trade.tid = expected_trade.tid # Hack to ignore auto-ID name
     assert expected_trade == actual_trade
 
 
