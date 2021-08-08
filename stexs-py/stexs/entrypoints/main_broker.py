@@ -3,6 +3,7 @@ import stexs.config as config
 import socket
 import json
 import random
+import time
 
 if __name__ == "__main__":
     txid = 1
@@ -11,16 +12,28 @@ if __name__ == "__main__":
             client.connect(config.get_socket_host_and_port())
             if client:
                 try:
-                    client.send(json.dumps({
-                        "type": "order",
-                        "txid": "%d" % txid,
-                        "broker": "MAGENTA",
-                        "csid": "1",
-                        "side": random.choice(["BUY", "SELL"]),
-                        "symbol": "STI.",
-                        "price": round(random.gauss(1, 0.25), 3),
-                        "volume": int(random.uniform(1, 10)),
-                    }).encode('ascii'))
+                    if txid == 1:
+                        client.send(json.dumps({
+                            "type": "list_stocks",
+                            "txid": "%d" % txid,
+                        }).encode('ascii'))
+                    elif txid % 10 == 0:
+                        client.send(json.dumps({
+                            "type": "summary",
+                            "txid": "%d" % txid,
+                            "symbol": "STI.",
+                        }).encode('ascii'))
+                    else:
+                        client.send(json.dumps({
+                            "type": "order",
+                            "txid": "%d" % txid,
+                            "broker": "MAGENTA",
+                            "csid": "1",
+                            "side": random.choice(["BUY", "SELL"]),
+                            "symbol": "STI.",
+                            "price": round(random.gauss(1, 0.25), 3),
+                            "volume": int(random.uniform(1, 10)),
+                        }).encode('ascii'))
                 except Exception as e:
                     print(e)
 
@@ -33,3 +46,5 @@ if __name__ == "__main__":
             client.shutdown(1)
             client.close()
             txid += 1
+            time.sleep(2)
+

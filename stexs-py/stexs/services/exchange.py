@@ -124,6 +124,21 @@ class Exchange:
 
         if msg["type"] == "order":
             reply = self.handle_order(msg)
+        elif msg["type"] == "list_stocks":
+            reply = sorted(list(list_stocks())) # list to serialize
+        elif msg["type"] == "summary":
+            with self.stock_uow() as uow:
+                try:
+                    symbol = uow.stocks.get(msg["symbol"]).symbol
+                    reply = {symbol: orderbook.summarise_books_for_symbol(symbol)}
+                except AttributeError:
+                    reply = {
+                        "type": "exception",
+                        "msg": "unknown symbol",
+                    }
+        elif msg["type"] == "level2":
+            # Full orderbook, history and summary
+            reply = []
 
         # Idempotent txid
         self.txid_set.add(msg["txid"])
