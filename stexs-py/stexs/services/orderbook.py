@@ -3,7 +3,7 @@ from stexs.domain.order import Order
 from stexs.services.logger import log
 import stexs.io.persistence as iop
 import copy
-import dataclasses
+from dataclasses import asdict as dataclasses_asdict
 from typing import List
 
 #TODO This should probably get injected somewhere but this works for now
@@ -116,7 +116,7 @@ def execute_trade(trade: model.Trade, uow=None):
         uow.commit()
 
     # TODO Persist the Trade itself
-    trade.closed = True
+    trade.clear_trade()
 
     with uow:
         confirmed_buys = [uow.orders.get(trade.buy_txid)]
@@ -166,6 +166,16 @@ def summarise_books(buy_book, sell_book, buy=None, sell=None):
         "buy": buy,
         "sell": sell,
     }
+
+def get_serialised_order_books_for_symbol(symbol, n=None, uow=None):
+    if not uow:
+        uow = _default_uow()
+
+    with uow:
+        return {
+            "buy_book": [dataclasses_asdict(order) for order in uow.orders.get_buy_book_for_symbol(symbol)[:n]],
+            "sell_book": [dataclasses_asdict(order) for order in uow.orders.get_sell_book_for_symbol(symbol)[:n]],
+        }
 
 def summarise_books_for_symbol(symbol, uow=None):
     if not uow:

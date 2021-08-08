@@ -128,14 +128,26 @@ class Exchange:
             reply = sorted(list(list_stocks())) # list to serialize
         elif msg["type"] == "summary":
             with self.stock_uow() as uow:
+                ok = True
                 try:
                     symbol = uow.stocks.get(msg["symbol"]).symbol
-                    reply = {symbol: orderbook.summarise_books_for_symbol(symbol)}
                 except AttributeError:
                     reply = {
                         "type": "exception",
                         "msg": "unknown symbol",
                     }
+                    ok = False
+
+                if ok:
+                    reply = {symbol: {
+                        "order_summary": {},
+                        "ticker_summary": {},
+                    }}
+                    reply[symbol]["order_summary"] = orderbook.summarise_books_for_symbol(symbol)
+                    reply[symbol]["ticker_summary"] = dataclasses_asdict(self.stalls[symbol])
+                    reply[symbol]["order_books"] = orderbook.get_serialised_order_books_for_symbol(symbol, n=10)
+                    log.critical(reply)
+
         elif msg["type"] == "level2":
             # Full orderbook, history and summary
             reply = []
