@@ -3,6 +3,7 @@ from dataclasses import replace as dataclass_replace
 from typing import List, Dict
 import time
 import copy
+import uuid
 
 from stexs.services.logger import log
 
@@ -28,6 +29,8 @@ class Client:
 
 @dataclass
 class Trade:
+    tid: str
+    ts: int
     symbol: str
     buy_txid: str
     avg_price: float
@@ -51,6 +54,7 @@ class Trade:
                 tot_price += (sell.price * sell.volume)
 
         return Trade(
+            tid=str(uuid.uuid4())[:5],
             symbol=filled_buy.symbol,
             volume=filled_buy.volume,
             buy_txid=filled_buy.txid,
@@ -59,7 +63,12 @@ class Trade:
             total_price=tot_price,
             excess=excess,
             closed=False,
+            ts=0,
         )
+
+    def clear_trade(self):
+        self.closed = True
+        self.ts = int(time.time())
 
 @dataclass
 class MarketStall:
@@ -69,7 +78,7 @@ class MarketStall:
     max_price: float = None
     n_trades: int = 0
     v_trades: float = 0
-    order_history = []
+    order_history: List[object] = field(default_factory = list)
 
     def __rich__(self):
         return ' '.join([
