@@ -137,7 +137,7 @@ if __name__ == "__main__":
             table.add_row(
                 tx["txid"],
                 tx["account_id"],
-                tx["ts"],
+                str(tx["sender_ts"]),
                 "[white on %s]%s[/]" % (side_colour, side_label),
                 str(tx["price"]),
                 str(tx["volume"]),
@@ -224,7 +224,7 @@ if __name__ == "__main__":
                                 "symbol": "STI.",
                                 "price": round(random.gauss(1, 0.25), 3),
                                 "volume": int(random.uniform(1, 10)),
-                                "ts": str(int(time())),
+                                "sender_ts": int(time()),
                             }
                             client.send(json.dumps(msg).encode("ascii"))
                     except Exception as e:

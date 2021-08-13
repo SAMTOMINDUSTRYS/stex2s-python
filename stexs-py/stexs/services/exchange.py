@@ -116,18 +116,27 @@ class Exchange:
         pass
 
     def recv(self, msg):
-        if msg["txid"] in self.txid_set:
-            reply = {
-                "response_type": "exception",
-                "response_code": 1,
-                "msg": "duplicate transaction",
-            }
+        if "txid" in msg:
+            if msg["txid"] in self.txid_set:
+                return {
+                    "response_type": "exception",
+                    "response_code": 1,
+                    "msg": "duplicate transaction",
+                }
+            else:
+                # Idempotent txid
+                self.txid_set.add(msg["txid"])
+
+        if "sender_ts" in msg:
+            if msg["sender_ts"] < (int(time.time()) - 60):
+                reply = {
+                    "response_type": "exception",
+                    "response_code": 1,
+                    "msg": "stale transaction",
+                }
 
         if msg["message_type"] == "new_order":
             reply = self.handle_order(msg)
-
-            # Idempotent txid
-            self.txid_set.add(msg["txid"])
 
         elif msg["message_type"] == "list_stocks":
             reply = sorted(list(list_stocks())) # list to serialize
