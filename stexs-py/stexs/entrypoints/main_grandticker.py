@@ -222,7 +222,7 @@ if __name__ == "__main__":
                                 "account_id": "1",
                                 "side": random.choice(["BUY", "SELL"]),
                                 "symbol": "STI.",
-                                "price": round(random.gauss(1, 0.25), 3),
+                                "price": str(round(random.gauss(1, 0.25), 3)),
                                 "volume": int(random.uniform(1, 10)),
                                 "sender_ts": int(time()),
                             }

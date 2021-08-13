@@ -60,12 +60,16 @@ class Exchange:
         if not user:
             raise Exception("Unknown user")
 
+        # Coerce to float (but use some sort of money class)
+        # TODO CRIT https://github.com/SAMTOMINDUSTRYS/stex2s-python/issues/2
+        price = float(msg["price"])
+
         order = Order(
             txid=msg["txid"],
             csid=msg["account_id"],
             side=msg["side"],
             symbol=msg["symbol"],
-            price=msg["price"],
+            price=price,
             volume=msg["volume"],
             ts=int(time.time()),
         )
