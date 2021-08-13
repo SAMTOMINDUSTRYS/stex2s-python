@@ -136,7 +136,7 @@ if __name__ == "__main__":
 
             table.add_row(
                 tx["txid"],
-                tx["csid"],
+                tx["account_id"],
                 tx["ts"],
                 "[white on %s]%s[/]" % (side_colour, side_label),
                 str(tx["price"]),
@@ -218,8 +218,8 @@ if __name__ == "__main__":
                                 "message_type": "new_order",
                                 "type": "order",
                                 "txid": "%d" % txid,
-                                "broker": "MAGENTA",
-                                "csid": "1",
+                                "broker_id": "MAGENTA",
+                                "account_id": "1",
                                 "side": random.choice(["BUY", "SELL"]),
                                 "symbol": "STI.",
                                 "price": round(random.gauss(1, 0.25), 3),

@@ -54,15 +54,15 @@ class Exchange:
             self.brokers[broker].update_users(buys, sells, executed=executed)
 
     def handle_order(self, msg):
-        if msg["broker"] not in self.brokers:
+        if msg["broker_id"] not in self.brokers:
             raise Exception("Malformed Broker")
-        user = self.brokers[msg["broker"]].get_user(msg["csid"])
+        user = self.brokers[msg["broker_id"]].get_user(msg["account_id"])
         if not user:
             raise Exception("Unknown user")
 
         order = Order(
             txid=msg["txid"],
-            csid=msg["csid"],
+            csid=msg["account_id"],
             side=msg["side"],
             symbol=msg["symbol"],
             price=msg["price"],
@@ -79,7 +79,7 @@ class Exchange:
         # Good transaction isolation is going to be needed to ensure balance
         # and holdings stay positive in the event of concurrent order handlers
         try:
-            self.brokers[msg["broker"]].validate_preorder(user, order)
+            self.brokers[msg["broker_id"]].validate_preorder(user, order)
         except Exception as e:
             raise e
 
