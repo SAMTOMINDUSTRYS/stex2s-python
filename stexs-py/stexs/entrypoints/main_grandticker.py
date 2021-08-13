@@ -181,15 +181,15 @@ if __name__ == "__main__":
         for col in ["dbuys", "nbuys", "vbuys", "buy" , "---", "sell", "vsells", "nsells", "dsells"]:
             summary_table.add_column(col, justify="center", ratio=1)
         summary_table.add_row(
-            str(summary["dbuys"]),
-            str(summary["nbuys"]),
-            str(summary["vbuys"]),
-            str(summary["buy"]),
+            str(summary["depth_buys"]),
+            str(summary["top_num_buys"]),
+            str(summary["top_vol_buys"]),
+            str(summary["current_buy"]),
             '---',
-            str(summary["sell"]),
-            str(summary["vsells"]),
-            str(summary["nsells"]),
-            str(summary["dsells"]),
+            str(summary["current_sell"]),
+            str(summary["top_vol_sells"]),
+            str(summary["top_num_sells"]),
+            str(summary["depth_sells"]),
         )
         return summary_table
 
@@ -217,14 +217,19 @@ if __name__ == "__main__":
                                 "message_type": "instrument_summary",
                                 "symbol": "STI.",
                             }).encode('ascii'))
-                        elif txid % 6 == 0:
-                            client.send(json.dumps({
-                                "message_type": "summary",
-                                "symbol": "STI.",
-                            }).encode('ascii'))
                         elif txid % 7 == 0:
                             client.send(json.dumps({
                                 "message_type": "instrument_trade_history",
+                                "symbol": "STI.",
+                            }).encode('ascii'))
+                        elif txid % 8 == 0:
+                            client.send(json.dumps({
+                                "message_type": "instrument_orderbook_summary",
+                                "symbol": "STI.",
+                            }).encode('ascii'))
+                        elif txid % 9 == 0:
+                            client.send(json.dumps({
+                                "message_type": "instrument_orderbook",
                                 "symbol": "STI.",
                             }).encode('ascii'))
                         else:
@@ -261,17 +266,15 @@ if __name__ == "__main__":
                         #TODO Open/close, last_trade vol/ts
                         layout["info"].update(make_info(symbol, name, last_buy, min_price, max_price, tot_vol, n_trade))
 
-                    elif txid % 6 == 0:
-                        payload = payload["STI."]
-                        layout["summary"].update(make_summary(payload["order_summary"]))
-
-
-                        buys_book = payload["order_books"]["buy_book"]
-                        sells_book = payload["order_books"]["sell_book"]
-                        layout["buys"].update(make_order_table(buys_book, direction="BUY", title="Buy Book"))
-                        layout["sells"].update(make_order_table(sells_book, direction="SELL", title="Sell Book"))
                     elif txid % 7 == 0:
                         layout["history"].update(make_trade_history(payload["trade_history"][-10:]))
+                    elif txid % 8 == 0:
+                        layout["summary"].update(make_summary(payload))
+                    elif txid % 9 == 0:
+                        buys_book = payload["buy_book"]
+                        sells_book = payload["sell_book"]
+                        layout["buys"].update(make_order_table(buys_book, direction="BUY", title="Buy Book"))
+                        layout["sells"].update(make_order_table(sells_book, direction="SELL", title="Sell Book"))
                     elif txid > 1:
                         layout["messages"].update(make_messages([msg]))
 

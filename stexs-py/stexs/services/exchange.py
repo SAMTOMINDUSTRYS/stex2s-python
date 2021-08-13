@@ -191,8 +191,8 @@ class Exchange:
                         "max_price": str(stall.max_price) if stall.max_price else None,
                         "num_trades": stall.n_trades,
                         "vol_trades": stall.v_trades,
-                        "name": self.stalls[symbol].stock.name,
-                        "symbol": self.stalls[symbol].stock.symbol,
+                        "name": stall.stock.name,
+                        "symbol": stall.stock.symbol,
                         "last_trade_price": None,
                         "last_trade_volume": None,
                         "last_trade_ts": None,
@@ -226,7 +226,7 @@ class Exchange:
                         "trade_history": [dataclasses_asdict(order) for order in self.stalls[symbol].order_history],
                     }
 
-        elif msg["message_type"] == "summary":
+        elif msg["message_type"] == "instrument_orderbook_summary":
             with self.stock_uow() as uow:
                 ok = True
                 try:
@@ -240,13 +240,45 @@ class Exchange:
                     ok = False
 
                 if ok:
-                    reply = {symbol: {
-                        "order_summary": {},
-                    }}
-                    reply[symbol]["order_summary"] = orderbook.summarise_books_for_symbol(symbol)
-                    reply[symbol]["order_books"] = orderbook.get_serialised_order_books_for_symbol(symbol, n=10)
-                    log.critical(reply)
+                    summary = orderbook.summarise_books_for_symbol(symbol)
+                    reply = {
+                        "response_type": "instrument_orderbook_summary",
+                        "response_code": 0,
+                        "msg": "ok",
+                        "symbol": symbol,
+                        "depth_buys": summary["dbuys"],
+                        "depth_sells": summary["dsells"],
+                        "top_num_buys": summary["nbuys"],
+                        "top_num_sells": summary["nsells"],
+                        "top_vol_buys": summary["vbuys"],
+                        "top_vol_sells": summary["vsells"],
+                        "current_buy": str(summary["buy"]), #TODO CRIT str
+                        "current_sell": str(summary["sell"]),
+                    }
 
+        elif msg["message_type"] == "instrument_orderbook":
+            with self.stock_uow() as uow:
+                ok = True
+                try:
+                    symbol = uow.stocks.get(msg["symbol"]).symbol
+                except AttributeError:
+                    reply = {
+                        "response_type": "exception",
+                        "response_code": 1,
+                        "msg": "unknown symbol",
+                    }
+                    ok = False
+
+                if ok:
+                    order_books = orderbook.get_serialised_order_books_for_symbol(symbol, n=10)
+                    reply = {
+                        "response_type": "instrument_orderbook_summary",
+                        "response_code": 0,
+                        "msg": "ok",
+                        "symbol": symbol,
+                        "buy_book": order_books["buy_book"],
+                        "sell_book": order_books["sell_book"],
+                    }
 
         else:
             reply = {
