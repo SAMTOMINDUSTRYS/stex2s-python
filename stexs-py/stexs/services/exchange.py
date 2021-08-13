@@ -54,11 +54,21 @@ class Exchange:
             self.brokers[broker].update_users(buys, sells, executed=executed)
 
     def handle_order(self, msg):
+        response = {}
+
         if msg["broker_id"] not in self.brokers:
-            raise Exception("Malformed Broker")
+            return {
+                "response_type": "exception",
+                "response_code": 404,
+                "msg": "malformed broker",
+            }
         user = self.brokers[msg["broker_id"]].get_user(msg["account_id"])
         if not user:
-            raise Exception("Unknown user")
+            return {
+                "response_type": "exception",
+                "response_code": 404,
+                "msg": "unknown user",
+            }
 
         # Coerce to float (but use some sort of money class)
         # TODO CRIT https://github.com/SAMTOMINDUSTRYS/stex2s-python/issues/2
@@ -77,7 +87,11 @@ class Exchange:
             try:
                 symbol = uow.stocks.get(order.symbol).symbol
             except AttributeError:
-                raise Exception("Unknown symbol")
+                return {
+                    "response_type": "exception",
+                    "response_code": 404,
+                    "msg": "unknown instrument",
+                }
 
         # Check this order can be completed before processing it
         # Good transaction isolation is going to be needed to ensure balance
@@ -85,7 +99,11 @@ class Exchange:
         try:
             self.brokers[msg["broker_id"]].validate_preorder(user, order)
         except Exception as e:
-            raise e
+            return {
+                "response_type": "exception",
+                "response_code": 70,
+                "msg": str(e),
+            }
 
         # Process order
         buys, sells = orderbook.add_order(order)
@@ -113,6 +131,9 @@ class Exchange:
 
         return {
             "order": dataclasses_asdict(order),
+            "response_type": "new_order",
+            "response_code": 0,
+            "msg": "ok",
         }
 
 
