@@ -204,17 +204,18 @@ if __name__ == "__main__":
                     try:
                         if txid == 1:
                             client.send(json.dumps({
-                                "type": "list_stocks",
+                                "message_type": "list_stocks",
                                 "txid": "%d" % txid,
                             }).encode('ascii'))
                         elif txid % 10 == 0:
                             client.send(json.dumps({
-                                "type": "summary",
+                                "message_type": "summary",
                                 "txid": "%d" % txid,
                                 "symbol": "STI.",
                             }).encode('ascii'))
                         else:
                             msg = {
+                                "message_type": "new_order",
                                 "type": "order",
                                 "txid": "%d" % txid,
                                 "broker": "MAGENTA",

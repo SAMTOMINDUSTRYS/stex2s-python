@@ -118,22 +118,29 @@ class Exchange:
     def recv(self, msg):
         if msg["txid"] in self.txid_set:
             reply = {
-                "type": "exception",
+                "response_type": "exception",
+                "response_code": 1,
                 "msg": "duplicate transaction",
             }
 
-        if msg["type"] == "order":
+        if msg["message_type"] == "new_order":
             reply = self.handle_order(msg)
-        elif msg["type"] == "list_stocks":
+
+            # Idempotent txid
+            self.txid_set.add(msg["txid"])
+
+        elif msg["message_type"] == "list_stocks":
             reply = sorted(list(list_stocks())) # list to serialize
-        elif msg["type"] == "summary":
+
+        elif msg["message_type"] == "summary":
             with self.stock_uow() as uow:
                 ok = True
                 try:
                     symbol = uow.stocks.get(msg["symbol"]).symbol
                 except AttributeError:
                     reply = {
-                        "type": "exception",
+                        "response_type": "exception",
+                        "response_code": 1,
                         "msg": "unknown symbol",
                     }
                     ok = False
@@ -148,11 +155,5 @@ class Exchange:
                     reply[symbol]["order_books"] = orderbook.get_serialised_order_books_for_symbol(symbol, n=10)
                     log.critical(reply)
 
-        elif msg["type"] == "level2":
-            # Full orderbook, history and summary
-            reply = []
-
-        # Idempotent txid
-        self.txid_set.add(msg["txid"])
 
         return reply
