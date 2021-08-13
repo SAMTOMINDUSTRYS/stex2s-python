@@ -166,6 +166,66 @@ class Exchange:
         elif msg["message_type"] == "list_stocks":
             reply = sorted(list(list_stocks())) # list to serialize
 
+        elif msg["message_type"] == "instrument_summary":
+            with self.stock_uow() as uow:
+                ok = True
+                try:
+                    symbol = uow.stocks.get(msg["symbol"]).symbol
+                except AttributeError:
+                    reply = {
+                        "response_type": "exception",
+                        "response_code": 1,
+                        "msg": "unknown symbol",
+                    }
+                    ok = False
+
+                if ok:
+                    stall = self.stalls[symbol]
+                    reply = {
+                        "response_type": "instrument_summary",
+                        "response_code": 0,
+                        "msg": "ok",
+                        "opening_price": None,
+                        "closing_price": None,
+                        "min_price": str(stall.min_price) if stall.min_price else None, # TODO CRIT str
+                        "max_price": str(stall.max_price) if stall.max_price else None,
+                        "num_trades": stall.n_trades,
+                        "vol_trades": stall.v_trades,
+                        "name": self.stalls[symbol].stock.name,
+                        "symbol": self.stalls[symbol].stock.symbol,
+                        "last_trade_price": None,
+                        "last_trade_volume": None,
+                        "last_trade_ts": None,
+                    }
+                    if len(stall.order_history) > 0:
+                        last_trade = stall.order_history[-1]
+                        reply["last_trade_price"] = str(last_trade.avg_price) # TODO CRIT str
+                        reply["last_trade_volume"] = last_trade.volume
+                        reply["last_trade_ts"] = last_trade.ts
+                    log.critical(reply)
+
+        elif msg["message_type"] == "instrument_trade_history":
+            with self.stock_uow() as uow:
+                ok = True
+                try:
+                    symbol = uow.stocks.get(msg["symbol"]).symbol
+                except AttributeError:
+                    reply = {
+                        "response_type": "exception",
+                        "response_code": 1,
+                        "msg": "unknown symbol",
+                    }
+                    ok = False
+
+                if ok:
+                    reply = {
+                        "response_type": "instrument_trade_history",
+                        "response_code": 0,
+                        "msg": "ok",
+                        "symbol": symbol,
+                        "trade_history": [dataclasses_asdict(order) for order in self.stalls[symbol].order_history],
+                    }
+
         elif msg["message_type"] == "summary":
             with self.stock_uow() as uow:
                 ok = True
@@ -182,12 +242,17 @@ class Exchange:
                 if ok:
                     reply = {symbol: {
                         "order_summary": {},
-                        "ticker_summary": {},
                     }}
                     reply[symbol]["order_summary"] = orderbook.summarise_books_for_symbol(symbol)
-                    reply[symbol]["ticker_summary"] = dataclasses_asdict(self.stalls[symbol])
                     reply[symbol]["order_books"] = orderbook.get_serialised_order_books_for_symbol(symbol, n=10)
                     log.critical(reply)
 
+
+        else:
+            reply = {
+                "response_type": "exception",
+                "response_code": 1,
+                "msg": "unknown message_type",
+            }
 
         return reply

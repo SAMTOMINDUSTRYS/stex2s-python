@@ -19,7 +19,7 @@ if __name__ == "__main__":
         Layout(name="tables"),
         Layout(name="messages", size=7),
         Layout(name="history"),
-        #Layout(name="footer", size=6),
+        Layout(name="footer", size=6),
     )
     layout["tables"].split_row(
         Layout(name="buys"),
@@ -42,6 +42,11 @@ if __name__ == "__main__":
     layout["header"].update(Header())
 
     def make_info(ticker, title, curr_price, min_price, max_price, tot_vol, tot_trade):
+
+        curr_price = float(curr_price) if curr_price is not None else None
+        min_price = float(min_price) if min_price is not None else None
+        max_price = float(max_price) if max_price is not None else None
+
         grid = Table.grid(expand=True, padding=(0,3,0,0))
         grid.add_column(justify="left", ratio=1)
         grid.add_column(justify="right")
@@ -207,10 +212,19 @@ if __name__ == "__main__":
                                 "message_type": "list_stocks",
                                 "txid": "%d" % txid,
                             }).encode('ascii'))
-                        elif txid % 10 == 0:
+                        elif txid % 5 == 0:
+                            client.send(json.dumps({
+                                "message_type": "instrument_summary",
+                                "symbol": "STI.",
+                            }).encode('ascii'))
+                        elif txid % 6 == 0:
                             client.send(json.dumps({
                                 "message_type": "summary",
-                                "txid": "%d" % txid,
+                                "symbol": "STI.",
+                            }).encode('ascii'))
+                        elif txid % 7 == 0:
+                            client.send(json.dumps({
+                                "message_type": "instrument_trade_history",
                                 "symbol": "STI.",
                             }).encode('ascii'))
                         else:
@@ -234,25 +248,30 @@ if __name__ == "__main__":
                     if not data:
                         break
                     payload = json.loads( data.decode("ascii") )
+                    layout["footer"].update(make_footer(payload))
 
-                    if txid % 10 == 0:
+                    if txid % 5 == 0:
+                        last_buy = payload["last_trade_price"]
+                        min_price = payload["min_price"]
+                        max_price = payload["max_price"]
+                        tot_vol = payload["vol_trades"]
+                        n_trade = payload["num_trades"]
+                        symbol = payload["symbol"]
+                        name = payload["name"]
+                        #TODO Open/close, last_trade vol/ts
+                        layout["info"].update(make_info(symbol, name, last_buy, min_price, max_price, tot_vol, n_trade))
+
+                    elif txid % 6 == 0:
                         payload = payload["STI."]
                         layout["summary"].update(make_summary(payload["order_summary"]))
 
-                        last_buy = payload["ticker_summary"]["last_price"]
-                        min_price = payload["ticker_summary"]["min_price"]
-                        max_price = payload["ticker_summary"]["max_price"]
-                        tot_vol = payload["ticker_summary"]["v_trades"]
-                        n_trade = payload["ticker_summary"]["n_trades"]
-                        symbol = payload["ticker_summary"]["stock"]["symbol"]
-                        name = payload["ticker_summary"]["stock"]["name"]
-                        layout["info"].update(make_info(symbol, name, last_buy, min_price, max_price, tot_vol, n_trade))
-                        layout["history"].update(make_trade_history(payload["ticker_summary"]["order_history"][-10:]))
 
                         buys_book = payload["order_books"]["buy_book"]
                         sells_book = payload["order_books"]["sell_book"]
                         layout["buys"].update(make_order_table(buys_book, direction="BUY", title="Buy Book"))
                         layout["sells"].update(make_order_table(sells_book, direction="SELL", title="Sell Book"))
+                    elif txid % 7 == 0:
+                        layout["history"].update(make_trade_history(payload["trade_history"][-10:]))
                     elif txid > 1:
                         layout["messages"].update(make_messages([msg]))
 
