@@ -9,6 +9,8 @@ from time import sleep, time
 import stexs.config as config
 import socket
 import json
+import sys
+from pynput import keyboard
 
 if __name__ == "__main__":
     layout = Layout()
@@ -20,6 +22,7 @@ if __name__ == "__main__":
         Layout(name="messages", size=7),
         Layout(name="history"),
         Layout(name="footer", size=6),
+        Layout(name="status", size=1),
     )
     layout["tables"].split_row(
         Layout(name="buys"),
@@ -199,63 +202,58 @@ if __name__ == "__main__":
             title="Last message",
         )
 
+    def make_status():
+        return "[bold black on #EC008C]Controls[/] [bold black on white]Space[/] Play next message [bold black on white]q[/] Quit"
+    layout["status"].update(make_status())
+
+    def recv_payload(client):
+        data = client.recv(65536)
+        if not data:
+            return None
+        payload = json.loads( data.decode("ascii") )
+        layout["footer"].update(make_footer(payload))
+        return payload
 
     with Live(layout, refresh_per_second=1, screen=True) as l:
         txid = 1
         while True:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
-                client.connect(config.get_socket_host_and_port())
-                if client:
-                    try:
-                        if txid == 1:
-                            client.send(json.dumps({
-                                "message_type": "list_stocks",
-                                "txid": "%d" % txid,
-                            }).encode('ascii'))
-                        elif txid % 5 == 0:
-                            client.send(json.dumps({
-                                "message_type": "instrument_summary",
-                                "symbol": "STI.",
-                            }).encode('ascii'))
-                        elif txid % 7 == 0:
-                            client.send(json.dumps({
-                                "message_type": "instrument_trade_history",
-                                "symbol": "STI.",
-                            }).encode('ascii'))
-                        elif txid % 8 == 0:
-                            client.send(json.dumps({
-                                "message_type": "instrument_orderbook_summary",
-                                "symbol": "STI.",
-                            }).encode('ascii'))
-                        elif txid % 9 == 0:
-                            client.send(json.dumps({
-                                "message_type": "instrument_orderbook",
-                                "symbol": "STI.",
-                            }).encode('ascii'))
-                        else:
-                            msg = {
-                                "message_type": "new_order",
-                                "type": "order",
-                                "txid": "%d" % txid,
-                                "broker_id": "MAGENTA",
-                                "account_id": "1",
-                                "side": random.choice(["BUY", "SELL"]),
-                                "symbol": "STI.",
-                                "price": str(round(random.gauss(1, 0.25), 3)),
-                                "volume": int(random.uniform(1, 10)),
-                                "sender_ts": int(time()),
-                            }
-                            client.send(json.dumps(msg).encode("ascii"))
-                    except Exception as e:
-                        raise e
-
-                    data = client.recv(65536)
-                    if not data:
+            # https://pynput.readthedocs.io/en/latest/keyboard.html#monitoring-the-keyboard
+            with keyboard.Events() as events:
+                for event in events:
+                    if event.key == keyboard.Key.space:
                         break
-                    payload = json.loads( data.decode("ascii") )
-                    layout["footer"].update(make_footer(payload))
+                    if hasattr(event.key, "char"):
+                        if event.key.char == 'q':
+                            sys.exit(0)
 
-                    if txid % 5 == 0:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+                    client.connect(config.get_socket_host_and_port())
+                    if client:
+                        # Send an order
+                        msg = {
+                            "message_type": "new_order",
+                            "type": "order",
+                            "txid": "%d" % txid,
+                            "broker_id": "MAGENTA",
+                            "account_id": "1",
+                            "side": random.choice(["BUY", "SELL"]),
+                            "symbol": "STI.",
+                            "price": str(round(random.gauss(1, 0.25), 3)),
+                            "volume": int(random.uniform(1, 10)),
+                            "sender_ts": int(time()),
+                        }
+                        client.send(json.dumps(msg).encode("ascii"))
+                        layout["messages"].update(make_messages([msg]))
+
+                        payload = recv_payload(client)
+
+                        # Update GUI
+                        client.send(json.dumps({
+                            "message_type": "instrument_summary",
+                            "symbol": "STI.",
+                        }).encode('ascii'))
+                        payload = recv_payload(client)
+
                         last_buy = payload["last_trade_price"]
                         min_price = payload["min_price"]
                         max_price = payload["max_price"]
@@ -266,20 +264,33 @@ if __name__ == "__main__":
                         #TODO Open/close, last_trade vol/ts
                         layout["info"].update(make_info(symbol, name, last_buy, min_price, max_price, tot_vol, n_trade))
 
-                    elif txid % 7 == 0:
+                        client.send(json.dumps({
+                            "message_type": "instrument_trade_history",
+                            "symbol": "STI.",
+                        }).encode('ascii'))
+                        payload = recv_payload(client)
                         layout["history"].update(make_trade_history(payload["trade_history"][-10:]))
-                    elif txid % 8 == 0:
+
+                        client.send(json.dumps({
+                            "message_type": "instrument_orderbook_summary",
+                            "symbol": "STI.",
+                        }).encode('ascii'))
+                        payload = recv_payload(client)
                         layout["summary"].update(make_summary(payload))
-                    elif txid % 9 == 0:
+
+                        client.send(json.dumps({
+                            "message_type": "instrument_orderbook",
+                            "symbol": "STI.",
+                        }).encode('ascii'))
+                        payload = recv_payload(client)
+
                         buys_book = payload["buy_book"]
                         sells_book = payload["sell_book"]
                         layout["buys"].update(make_order_table(buys_book, direction="BUY", title="Buy Book"))
                         layout["sells"].update(make_order_table(sells_book, direction="SELL", title="Sell Book"))
-                    elif txid > 1:
-                        layout["messages"].update(make_messages([msg]))
 
-                client.shutdown(1)
-                client.close()
-                txid += 1
-                sleep(0.1)
+                    client.shutdown(1)
+                    client.close()
+                    txid += 1
+                    sleep(0.1)
 
