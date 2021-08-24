@@ -243,7 +243,7 @@ if __name__ == "__main__":
         #   Disables line-by-line
         #   Disables line editing
         # not IEXTEN
-        new[tty.LFLAG] = new[tty.LFLAG] & ~(termios.ECHO | termios.ICANON)
+        new[tty.LFLAG] = new[tty.LFLAG] & ~(termios.ECHO | termios.ICANON | termios.IEXTEN)
 
         # VMIN Minimum number of characters for noncanonical read
         new[tty.CC][termios.VMIN] = 1
