@@ -3,6 +3,7 @@ from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
+from rich.prompt import Prompt
 from datetime import datetime
 import random
 from time import sleep, time
@@ -10,6 +11,8 @@ import stexs.config as config
 import socket
 import json
 import sys
+import tty
+import termios
 from pynput import keyboard
 
 if __name__ == "__main__":
@@ -28,6 +31,15 @@ if __name__ == "__main__":
         Layout(name="buys"),
         Layout(name="sells"),
     )
+
+
+    class STEXEvents(keyboard.Events):
+        def __init__(self):
+            super(keyboard.Events, self).__init__(
+                on_press=self.Press,
+                on_release=self.Release,
+                #suppress=True, enable this to either crash the shell, or take complete exclusive input from X such that you need sysreq to get the system back
+            )
 
 
     # Header
@@ -202,9 +214,11 @@ if __name__ == "__main__":
             title="Last message",
         )
 
-    def make_status():
-        return "[bold black on #EC008C]Controls[/] [bold black on white]Space[/] Play next message [bold black on white]q[/] Quit"
-    layout["status"].update(make_status())
+    def make_status(status=None):
+        if not status:
+            return "[bold black on #EC008C]Controls[/] [bold black on white]Space[/] Play next message [bold black on white]o[/] Order [bold black on white]q[/] Quit"
+        else:
+            return status
 
     def recv_payload(client):
         data = client.recv(65536)
@@ -214,83 +228,160 @@ if __name__ == "__main__":
         layout["footer"].update(make_footer(payload))
         return payload
 
-    with Live(layout, refresh_per_second=1, screen=True) as l:
+    def hoot_char():
+        # jfc what the f am i doing
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
+        new = termios.tcgetattr(fd)
+
+        # ICRNL Translate carriage return to newline on input
+        # not IGNCR Ignore carriage return on input
+        new[tty.IFLAG] = new[tty.IFLAG] | termios.ICRNL & ~termios.IGNCR
+
+        # not ECHO
+        # not ICANON (non canonical mode)
+        #   Disables line-by-line
+        #   Disables line editing
+        # not IEXTEN
+        new[tty.LFLAG] = new[tty.LFLAG] & ~(termios.ECHO | termios.ICANON)
+
+        # VMIN Minimum number of characters for noncanonical read
+        new[tty.CC][termios.VMIN] = 1
+
+        try:
+            # Apply
+            termios.tcsetattr(fd, termios.TCSANOW, new)
+            ch = sys.stdin.read(1)
+        finally:
+            # Reset
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        return ch
+
+
+    with Live(layout, refresh_per_second=25, screen=True) as l:
         txid = 1
+
         while True:
+            layout["status"].update(make_status())
+            auto_order = True
+            manual_order = ""
+            manual_side = manual_price = manual_vol = None
+
             # https://pynput.readthedocs.io/en/latest/keyboard.html#monitoring-the-keyboard
-            with keyboard.Events() as events:
+            with STEXEvents() as events:
                 for event in events:
                     if event.key == keyboard.Key.space:
                         break
-                    if hasattr(event.key, "char"):
+                    elif hasattr(event.key, "char"):
                         if event.key.char == 'q':
                             sys.exit(0)
+                        elif event.key.char == 'o':
+                            auto_order = False
+                            break
+                char = hoot_char() # Naive consume from stdin as pynput can't suppress, works for now
 
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
-                    client.connect(config.get_socket_host_and_port())
-                    if client:
-                        # Send an order
-                        msg = {
-                            "message_type": "new_order",
-                            "type": "order",
-                            "txid": "%d" % txid,
-                            "broker_id": "MAGENTA",
-                            "account_id": "1",
-                            "side": random.choice(["BUY", "SELL"]),
-                            "symbol": "STI.",
-                            "price": str(round(random.gauss(1, 0.25), 3)),
-                            "volume": int(random.uniform(1, 10)),
-                            "sender_ts": int(time()),
-                        }
-                        client.send(json.dumps(msg).encode("ascii"))
-                        layout["messages"].update(make_messages([msg]))
+            if not auto_order:
+                manual_order = ""
+                manual_prompt_base = "[bold white on black]Enter an order in the format: [[green]BUY[/]|[red]SELL[/]] [[cyan]VOL[/]]@[[yellow]PRICE[/]][/] "
+                manual_prompt = manual_prompt_base
+                not_valid = True
+                while not_valid:
+                    layout["status"].update(make_status(manual_prompt))
 
-                        payload = recv_payload(client)
+                    char = hoot_char()
 
-                        # Update GUI
-                        client.send(json.dumps({
-                            "message_type": "instrument_summary",
-                            "symbol": "STI.",
-                        }).encode('ascii'))
-                        payload = recv_payload(client)
+                    if char == '\x7f':
+                        # Backspace
+                        manual_order = manual_order[:-1]
+                        manual_prompt = manual_prompt[:-1]
+                    elif char == '\n':
+                        # Submit
+                        try:
+                            manual_side, volprice = manual_order.split(" ")
+                            manual_side = manual_side.upper()
+                            manual_vol, manual_price = volprice.split("@")
+                            not_valid = False
+                        except Exception as e:
+                            manual_prompt = manual_prompt_base
+                            manual_order = ""
+                            not_valid = True
+                    elif char is not None:
+                        # Assume char is good
+                        manual_order += str(char)
+                        manual_prompt += str(char)
 
-                        last_buy = payload["last_trade_price"]
-                        min_price = payload["min_price"]
-                        max_price = payload["max_price"]
-                        tot_vol = payload["vol_trades"]
-                        n_trade = payload["num_trades"]
-                        symbol = payload["symbol"]
-                        name = payload["name"]
-                        #TODO Open/close, last_trade vol/ts
-                        layout["info"].update(make_info(symbol, name, last_buy, min_price, max_price, tot_vol, n_trade))
 
-                        client.send(json.dumps({
-                            "message_type": "instrument_trade_history",
-                            "symbol": "STI.",
-                        }).encode('ascii'))
-                        payload = recv_payload(client)
-                        layout["history"].update(make_trade_history(payload["trade_history"][-10:]))
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+                client.connect(config.get_socket_host_and_port())
+                if client:
+                    # Send an order
+                    msg = {
+                        "message_type": "new_order",
+                        "type": "order",
+                        "txid": "%d" % txid,
+                        "broker_id": "MAGENTA",
+                        "account_id": "1",
+                        "side": random.choice(["BUY", "SELL"]),
+                        "symbol": "STI.",
+                        "price": str(round(random.gauss(1, 0.25), 3)),
+                        "volume": int(random.uniform(1, 10)),
+                        "sender_ts": int(time()),
+                    }
+                    if not auto_order:
+                        msg["side"] = manual_side
+                        msg["price"] = manual_price
+                        msg["volume"] = int(manual_vol)
+                        auto_order = True
 
-                        client.send(json.dumps({
-                            "message_type": "instrument_orderbook_summary",
-                            "symbol": "STI.",
-                        }).encode('ascii'))
-                        payload = recv_payload(client)
-                        layout["summary"].update(make_summary(payload))
+                    client.send(json.dumps(msg).encode("ascii"))
+                    layout["messages"].update(make_messages([msg]))
 
-                        client.send(json.dumps({
-                            "message_type": "instrument_orderbook",
-                            "symbol": "STI.",
-                        }).encode('ascii'))
-                        payload = recv_payload(client)
+                    payload = recv_payload(client)
 
-                        buys_book = payload["buy_book"]
-                        sells_book = payload["sell_book"]
-                        layout["buys"].update(make_order_table(buys_book, direction="BUY", title="Buy Book"))
-                        layout["sells"].update(make_order_table(sells_book, direction="SELL", title="Sell Book"))
+                    # Update GUI
+                    client.send(json.dumps({
+                        "message_type": "instrument_summary",
+                        "symbol": "STI.",
+                    }).encode('ascii'))
+                    payload = recv_payload(client)
 
-                    client.shutdown(1)
-                    client.close()
-                    txid += 1
-                    sleep(0.1)
+                    last_buy = payload["last_trade_price"]
+                    min_price = payload["min_price"]
+                    max_price = payload["max_price"]
+                    tot_vol = payload["vol_trades"]
+                    n_trade = payload["num_trades"]
+                    symbol = payload["symbol"]
+                    name = payload["name"]
+                    #TODO Open/close, last_trade vol/ts
+                    layout["info"].update(make_info(symbol, name, last_buy, min_price, max_price, tot_vol, n_trade))
+
+                    client.send(json.dumps({
+                        "message_type": "instrument_trade_history",
+                        "symbol": "STI.",
+                    }).encode('ascii'))
+                    payload = recv_payload(client)
+                    layout["history"].update(make_trade_history(payload["trade_history"][-10:]))
+
+                    client.send(json.dumps({
+                        "message_type": "instrument_orderbook_summary",
+                        "symbol": "STI.",
+                    }).encode('ascii'))
+                    payload = recv_payload(client)
+                    layout["summary"].update(make_summary(payload))
+
+                    client.send(json.dumps({
+                        "message_type": "instrument_orderbook",
+                        "symbol": "STI.",
+                    }).encode('ascii'))
+                    payload = recv_payload(client)
+
+                    buys_book = payload["buy_book"]
+                    sells_book = payload["sell_book"]
+                    layout["buys"].update(make_order_table(buys_book, direction="BUY", title="Buy Book"))
+                    layout["sells"].update(make_order_table(sells_book, direction="SELL", title="Sell Book"))
+
+                client.shutdown(1)
+                client.close()
+                txid += 1
+                sleep(0.1)
 
