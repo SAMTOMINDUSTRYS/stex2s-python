@@ -45,7 +45,7 @@ def test_message_transaction_set(exchange):
 
 
 def test_message_transaction_set(exchange):
-    exchange.recv({"txid": 1, "message_type": "invalid"})
+    r = exchange.recv({"txid": 1, "message_type": "invalid"})
     assert r["response_code"] == 1
     assert r["response_type"] == "exception"
     assert r["msg"] == "unknown message_type"
