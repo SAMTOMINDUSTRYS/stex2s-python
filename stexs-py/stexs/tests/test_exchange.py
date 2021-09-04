@@ -44,6 +44,13 @@ def test_message_transaction_set(exchange):
     assert exchange.txid_set == set([1, 800, 2, 808])
 
 
+def test_message_transaction_set(exchange):
+    exchange.recv({"txid": 1, "message_type": "invalid"})
+    assert r["response_code"] == 1
+    assert r["response_type"] == "exception"
+    assert r["msg"] == "unknown message_type"
+
+
 def test_message_duplicate_transaction(exchange):
     exchange.txid_set.add(1)
     msg = {"txid": 1, "message_type": "test"}
