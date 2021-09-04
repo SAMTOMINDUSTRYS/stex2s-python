@@ -24,7 +24,7 @@ def wrap_service_match_one(buys, sells):
 def wrap_service_execute_trade(trade):
     return orderbook.execute_trade(trade, uow=TEST_ORDER_UOW())
 
-# Test add_order service (not the underlying persistence)
+# Test add_order internal service (not the underlying persistence, or external JSON service)
 def test_add_order():
     expected_order = Order(
         txid="1",

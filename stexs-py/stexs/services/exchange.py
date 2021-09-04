@@ -154,7 +154,7 @@ class Exchange:
 
         if "sender_ts" in msg:
             if msg["sender_ts"] < (int(time.time()) - 60):
-                reply = {
+                return {
                     "response_type": "exception",
                     "response_code": 1,
                     "msg": "stale transaction",
