@@ -22,6 +22,14 @@ def stock_uow():
     return uow
 
 
+def test_message_transaction_set(exchange):
+    exchange.recv({"txid": 1, "message_type": "test"})
+    exchange.recv({"txid": 800, "message_type": "test"})
+    exchange.recv({"txid": 2, "message_type": "test"})
+    exchange.recv({"txid": 808, "message_type": "test"})
+    assert exchange.txid_set == set([1, 800, 2, 808])
+
+
 def test_message_duplicate_transaction(exchange):
     exchange.txid_set.add(1)
     msg = {"txid": 1, "message_type": "test"}
