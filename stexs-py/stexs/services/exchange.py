@@ -164,7 +164,7 @@ class Exchange:
             reply = self.handle_order(msg)
 
         elif msg["message_type"] == "list_stocks":
-            reply = sorted(list(list_stocks())) # list to serialize
+            reply = sorted(list(self.list_stocks())) # list to serialize
 
         elif msg["message_type"] == "instrument_summary":
             with self.stock_uow() as uow:
