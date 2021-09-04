@@ -88,7 +88,7 @@ def test_add_order_ok(exchange):
     assert r["msg"] == "ok"
 
 
-def test_add_order_malformed_broker(exchange):
+def test_add_order_unknown_broker(exchange):
     msg = {
         "txid": 1,
         "message_type": "new_order",
@@ -106,7 +106,7 @@ def test_add_order_malformed_broker(exchange):
     assert r["msg"] == "malformed broker"
 
 
-def test_add_order_malformed_broker(exchange):
+def test_add_order_unknown_user(exchange):
     msg = {
         "txid": 1,
         "message_type": "new_order",
