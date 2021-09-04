@@ -18,7 +18,6 @@ if __name__ == "__main__":
 
     broker = Broker(code="MAGENTA", name="Magenta Holdings Plc.")
     stex.add_broker(broker)
-    broker.connect_exchange(stex) # Little hack to emulate a connection from Broker to Exchange
 
     clients = [
         model.Client(csid="1", name="Sam"),

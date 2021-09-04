@@ -10,10 +10,6 @@ class Broker:
         self.code = code
         self.name = name
         self.user_uow = iop.user.MemoryClientUoW
-        self.exchange = None
-
-    def connect_exchange(self, exchange):
-        self.exchange = exchange
 
     def get_user(self, csid: str):
         with self.user_uow() as uow:
@@ -58,9 +54,10 @@ class Broker:
         log.info("[bold magenta]USER[/] [b]CASH[/] %s=%.3f" % (csid, user.balance))
 
     def adjust_holding(self, csid, symbol, adjust_qty):
-        stock_list = self.exchange.list_stocks()
-        if not symbol in stock_list:
-            raise Exception("Unknown symbol")
+        # TODO Validate holdings (broker would probably cache the stock list)
+        #stock_list = self.exchange.list_stocks()
+        #if not symbol in stock_list:
+        #    raise Exception("Unknown symbol")
 
         with self.user_uow() as uow:
             user = uow.users.get(csid)
