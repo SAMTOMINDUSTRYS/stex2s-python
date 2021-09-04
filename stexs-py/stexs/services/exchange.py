@@ -96,6 +96,7 @@ class Exchange:
         # Check this order can be completed before processing it
         # Good transaction isolation is going to be needed to ensure balance
         # and holdings stay positive in the event of concurrent order handlers
+        # TODO Catch domain exceptions properly
         try:
             self.brokers[msg["broker_id"]].validate_preorder(user, order)
         except Exception as e:
