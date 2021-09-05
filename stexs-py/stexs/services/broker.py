@@ -37,8 +37,11 @@ class Broker:
             raise e
         return True
 
-    def update_users(self, buy_orders, sell_orders, executed=False):
-        with self.user_uow() as uow:
+    def update_users(self, buy_orders, sell_orders, executed=False, uow=None):
+        if not uow:
+            uow = self.user_uow()
+
+        with uow:
             if not executed:
                 for order in buy_orders:
                     self.adjust_balance(order.csid, order.price * order.volume * -1)

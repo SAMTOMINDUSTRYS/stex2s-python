@@ -185,3 +185,56 @@ def test_service_validate_preorder_ok(broker):
         order=Order(txid=1, csid="10", ts=0, side="BUY", symbol="STI.", price=100, volume=1)
     )
 
+# Note test_service_simple_update_users does not check business rules around
+# buys/sells executing together, splits or anything handled by execute_trade
+# These tests merely check the right accounting is done on the user
+def test_service_simple_update_users_buy(broker, uow):
+    buys = [
+        Order(txid=1, csid="1", ts=0, side="BUY", symbol="STI.", price=1, volume=100)
+    ]
+    sells = [
+    ]
+    broker.update_users(buys, sells, uow=uow())
+
+    with uow() as test_uow:
+        client = test_uow.users.get("1")
+        assert client.balance == 0
+
+def test_service_simple_update_users_sell(broker, uow):
+    buys = [
+    ]
+    sells = [
+        Order(txid=1, csid="1", ts=0, side="SELL", symbol="STI.", price=1, volume=100)
+    ]
+    broker.update_users(buys, sells, uow=uow())
+
+    with uow() as test_uow:
+        client = test_uow.users.get("1")
+        assert client.holdings["STI."] == 0
+
+def test_service_simple_update_users_buy_executed(broker, uow):
+    buys = [
+        Order(txid=1, csid="1", ts=0, side="BUY", symbol="STI.", price=1, volume=100)
+    ]
+    sells = [
+    ]
+    broker.update_users(buys, sells, executed=True, uow=uow())
+
+    with uow() as test_uow:
+        client = test_uow.users.get("1")
+        assert client.holdings["STI."] == 200
+
+def test_service_simple_update_users_sell_executed(broker, uow):
+    buys = [
+    ]
+    sells = [
+        Order(txid=1, csid="1", ts=0, side="SELL", symbol="STI.", price=1, volume=100)
+    ]
+    broker.update_users(buys, sells, executed=True, uow=uow())
+
+    with uow() as test_uow:
+        client = test_uow.users.get("1")
+        assert client.balance == 200
+
+def test_service_simple_update_users_buy_aborted(broker, uow):
+    pass

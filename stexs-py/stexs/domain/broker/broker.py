@@ -37,4 +37,4 @@ class Client:
                 if self.holdings[symbol] < volume:
                     raise InsufficientHoldingException("Insufficient holding")
         return True
-    
+
