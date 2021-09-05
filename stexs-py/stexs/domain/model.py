@@ -5,7 +5,7 @@ import time
 import copy
 import uuid
 
-from stexs.services.logger import log
+from stexs.services.logger import log # TODO Remove service dependency
 
 @dataclass
 class Stock:

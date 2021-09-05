@@ -12,3 +12,13 @@ class Client:
     def stexid(self):
         return self.csid
 
+    # TODO CRIT what about <0 balance
+    def adjust_balance(self, balance_adjustment):
+        self.balance += balance_adjustment
+
+    # TODO CRIT what about <0 holdings
+    def adjust_holding(self, symbol, adjust_qty):
+        if symbol not in self.holdings:
+            self.holdings[symbol] = 0
+        self.holdings[symbol] += adjust_qty
+
