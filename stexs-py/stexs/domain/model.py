@@ -16,16 +16,6 @@ class Stock:
     def stexid(self):
         return self.symbol
 
-@dataclass
-class Client:
-    csid: str
-    name: str
-    balance: float = 0
-    holdings: Dict[str, int] = field(default_factory = dict)
-
-    @property
-    def stexid(self):
-        return self.csid
 
 @dataclass
 class Trade:

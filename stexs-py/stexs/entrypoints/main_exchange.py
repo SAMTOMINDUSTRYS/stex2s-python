@@ -1,4 +1,5 @@
 from stexs.domain import model
+from stexs.domain.broker import Client
 from stexs.services.exchange import Exchange
 from stexs.services.broker import Broker
 from stexs.services.logger import log
@@ -20,7 +21,7 @@ if __name__ == "__main__":
     stex.add_broker(broker)
 
     clients = [
-        model.Client(csid="1", name="Sam"),
+        Client(csid="1", name="Sam"),
     ]
     broker.add_users(clients)
     broker.adjust_balance(csid="1", adjust_balance=+100000)

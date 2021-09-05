@@ -1,5 +1,5 @@
-from stexs.domain import model
 from stexs.domain.broker import (
+    Client,
     InsufficientBalanceException,
     InsufficientHoldingException,
 )
@@ -19,7 +19,7 @@ class Broker:
         with self.user_uow() as uow:
             return uow.users.get(csid)
 
-    def add_users(self, clients: List[model.Client]):
+    def add_users(self, clients: List[Client]):
         with self.user_uow() as uow:
             for client in clients:
                 uow.users.add(client)
