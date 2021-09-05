@@ -1,4 +1,8 @@
 from stexs.domain import model
+from stexs.domain.broker import (
+    InsufficientBalanceException,
+    InsufficientHoldingException,
+)
 from stexs.services.logger import log
 import stexs.io.persistence as iop
 from typing import List, Dict
@@ -24,13 +28,13 @@ class Broker:
     def validate_preorder(self, user, order):
         if order.side == "BUY":
             if order.price * order.volume > user.balance:
-                raise Exception("Insufficient balance")
+                raise InsufficientBalanceException("Insufficient balance")
         elif order.side == "SELL":
             if order.symbol not in user.holdings:
-                raise Exception("Insufficient holding")
+                raise InsufficientHoldingException("Insufficient holding")
             else:
                 if user.holdings[order.symbol] < order.volume:
-                    raise Exception("Insufficient holding")
+                    raise InsufficientHoldingException("Insufficient holding")
 
     def update_users(self, buy_orders, sell_orders, executed=False):
         if not executed:

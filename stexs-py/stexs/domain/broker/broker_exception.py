@@ -1,9 +1,9 @@
 class OrderScreeningException(Exception):
     pass
 
-class InsuffientBalanceException(OrderScreeningException):
+class InsufficientBalanceException(OrderScreeningException):
     pass
 
-class InsuffientHoldingException(OrderScreeningException):
+class InsufficientHoldingException(OrderScreeningException):
     pass
 
