@@ -162,6 +162,9 @@ class Exchange:
             reply["last_trade_ts"] = last_trade.ts
         return reply
 
+    def get_trade_history(self, stall):
+        return [dataclasses_asdict(order) for order in stall.order_history]
+
     def recv(self, msg):
         if "txid" in msg:
             if msg["txid"] in self.txid_set:
@@ -219,7 +222,7 @@ class Exchange:
                 except AttributeError:
                     reply = {
                         "response_type": "exception",
-                        "response_code": 1,
+                        "response_code": 404,
                         "msg": "unknown symbol",
                     }
                     ok = False
@@ -230,7 +233,7 @@ class Exchange:
                         "response_code": 0,
                         "msg": "ok",
                         "symbol": symbol,
-                        "trade_history": [dataclasses_asdict(order) for order in self.stalls[symbol].order_history],
+                        "trade_history": self.get_trade_history(self.stalls[symbol]),
                     }
 
         elif msg["message_type"] == "instrument_orderbook_summary":
@@ -241,7 +244,7 @@ class Exchange:
                 except AttributeError:
                     reply = {
                         "response_type": "exception",
-                        "response_code": 1,
+                        "response_code": 404,
                         "msg": "unknown symbol",
                     }
                     ok = False
@@ -271,7 +274,7 @@ class Exchange:
                 except AttributeError:
                     reply = {
                         "response_type": "exception",
-                        "response_code": 1,
+                        "response_code": 404,
                         "msg": "unknown symbol",
                     }
                     ok = False
@@ -279,7 +282,7 @@ class Exchange:
                 if ok:
                     order_books = orderbook.get_serialised_order_books_for_symbol(symbol, n=10)
                     reply = {
-                        "response_type": "instrument_orderbook_summary",
+                        "response_type": "instrument_orderbook",
                         "response_code": 0,
                         "msg": "ok",
                         "symbol": symbol,

@@ -3,7 +3,9 @@ import time
 
 from stexs.domain import model
 from stexs.services.exchange import Exchange
+from stexs.services import orderbook
 import stexs.io.persistence as iop
+from dataclasses import asdict as dataclasses_asdict
 
 #TODO Will need to mock/test the sockety stuff eventually
 class TestSocketClient():
@@ -13,7 +15,11 @@ class TestSocketClient():
 def exchange():
     stex = Exchange()
 
-    # Stocks
+    # Clear orders
+    with iop.order.OrderMemoryUoW() as uow:
+        uow.orders.clear()
+
+    # Reset stocks
     stex.stock_uow = iop.stock.MemoryStockUoW
     repo = iop.base.GenericMemoryRepository(prefix="stocks")
     repo.store.clear()
@@ -32,6 +38,7 @@ def exchange():
         def update_users(self, buys, sells, executed):
             return True
     stex.brokers["MAGENTA"] = BasicBroker()
+
     return stex
 
 
@@ -157,7 +164,7 @@ def test_instrument_summary_unknown_stock(exchange):
     assert r["msg"] == "unknown symbol"
 
 
-# TODO Should probably mock the stall but we're going to delete it soon
+# TODO Should probably mock the stall here and test it properly somewhere else but we're going to delete it soon
 def test_format_instrument_summary(exchange):
     stall = model.MarketStall(stock=model.Stock(symbol="STI.", name="Sam and Tom Industrys"))
     price = 1.25
@@ -202,4 +209,89 @@ def test_instrument_summary(exchange):
     assert r["response_type"] == "instrument_summary"
     assert r["response_code"] == 0
     assert r["msg"] == "ok"
+
+
+def test_instrument_trade_history_unknown_stock(exchange):
+    msg = {"txid": 1, "message_type": "instrument_trade_history", "symbol": "TSI."}
+    r = exchange.recv(msg)
+    assert r["response_type"] == "exception"
+    assert r["response_code"] == 404
+    assert r["msg"] == "unknown symbol"
+
+
+# Again, belongs in a test suite for marketstall, but we're gonna get rid of it soon
+def test_format_instrument_trade_history(exchange):
+    stall = model.MarketStall(stock=model.Stock(symbol="STI.", name="Sam and Tom Industrys"))
+    trade = model.Trade(
+        tid="12345",
+        symbol="STI.",
+        buy_txid=1,
+        total_price=1.25*100,
+        avg_price=1.25,
+        volume=100,
+        ts=int(time.time()),
+    )
+    stall.log_trade(trade)
+
+    trade_history = exchange.get_trade_history(stall)
+    assert trade_history == [dataclasses_asdict(trade)]
+
+def test_instrument_trade_history_empty(exchange):
+    msg = {"txid": 1, "message_type": "instrument_trade_history", "symbol": "STI."}
+    r = exchange.recv(msg)
+    assert r["response_type"] == "instrument_trade_history"
+    assert r["response_code"] == 0
+    assert r["msg"] == "ok"
+    assert r["symbol"] == "STI."
+    assert r["trade_history"] == []
+
+
+def test_instrument_orderbook_summary_unknown_stock(exchange):
+    msg = {"txid": 1, "message_type": "instrument_orderbook_summary", "symbol": "TSI."}
+    r = exchange.recv(msg)
+    assert r["response_type"] == "exception"
+    assert r["response_code"] == 404
+    assert r["msg"] == "unknown symbol"
+
+
+# We have already tested orderbook.summarise_books_for_symbol
+def test_format_instrument_orderbook_summary(exchange):
+    summary = orderbook.summarise_books_for_symbol("STI.")
+
+    msg = {"txid": 1, "message_type": "instrument_orderbook_summary", "symbol": "STI."}
+    r = exchange.recv(msg)
+    assert r["response_type"] == "instrument_orderbook_summary"
+    assert r["response_code"] == 0
+    assert r["msg"] == "ok"
+    assert r["depth_buys"] == summary["dbuys"]
+    assert r["depth_sells"] == summary["dsells"]
+    assert r["top_num_buys"] == summary["nbuys"]
+    assert r["top_num_sells"] == summary["nsells"]
+    assert r["top_vol_buys"] == summary["vbuys"]
+    assert r["top_vol_sells"] == summary["vsells"]
+    assert r["current_buy"] == str(summary["buy"])
+    assert r["current_sell"] == str(summary["sell"])
+
+
+def test_instrument_orderbook_unknown_stock(exchange):
+    msg = {"txid": 1, "message_type": "instrument_orderbook", "symbol": "TSI."}
+    r = exchange.recv(msg)
+    assert r["response_type"] == "exception"
+    assert r["response_code"] == 404
+    assert r["msg"] == "unknown symbol"
+
+
+# We have already tested orderbook.get_serialised_order_books_for_symbol
+# TODO Test with n=10 properly
+def test_format_instrument_orderbook_empty(exchange):
+    order_books = orderbook.get_serialised_order_books_for_symbol("STI.", n=10)
+
+    msg = {"txid": 1, "message_type": "instrument_orderbook", "symbol": "STI."}
+    r = exchange.recv(msg)
+    assert r["response_type"] == "instrument_orderbook"
+    assert r["response_code"] == 0
+    assert r["msg"] == "ok"
+    assert r["symbol"] == "STI."
+    assert r["buy_book"] == order_books["buy_book"]
+    assert r["sell_book"] == order_books["sell_book"]
 
