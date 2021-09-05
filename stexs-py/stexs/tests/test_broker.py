@@ -1,5 +1,6 @@
 import pytest
 
+from stexs.domain.order import Order
 from stexs.domain.broker import (
     Client,
     InsufficientBalanceException,
@@ -162,8 +163,25 @@ def test_service_adjust_holding(broker, uow):
         client = test_uow.users.get("1")
         assert client.holdings["STI."] == 100
 
-def test_service_validate_preorder(broker):
-    pass
+# Test that exception bubbles up
+def test_service_validate_preorder_bad_balance(broker):
+    with pytest.raises(InsufficientBalanceException, match="Insufficient balance"):
+        broker.validate_preorder(
+            user=Client(csid="10", name="Sam", balance=100),
+            order=Order(txid=1, csid="10", ts=0, side="BUY", symbol="STI.", price=101, volume=1)
+        )
 
-def test_service_validate_preorder(broker):
-    pass
+# Test that exception bubbles up
+def test_service_validate_preorder_bad_holding(broker):
+    with pytest.raises(InsufficientHoldingException, match="No holding"):
+        broker.validate_preorder(
+            user=Client(csid="10", name="Sam", balance=100),
+            order=Order(txid=1, csid="10", ts=0, side="SELL", symbol="TSI.", price=101, volume=1)
+        )
+
+def test_service_validate_preorder_ok(broker):
+    assert broker.validate_preorder(
+        user=Client(csid="10", name="Sam", balance=100),
+        order=Order(txid=1, csid="10", ts=0, side="BUY", symbol="STI.", price=100, volume=1)
+    )
+

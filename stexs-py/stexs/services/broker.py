@@ -35,6 +35,7 @@ class Broker:
             user.screen_order(order.side, order.symbol, order.price, order.volume)
         except OrderScreeningException as e:
             raise e
+        return True
 
     def update_users(self, buy_orders, sell_orders, executed=False):
         with self.user_uow() as uow:
