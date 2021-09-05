@@ -1,19 +1,19 @@
 import pytest
 import time
+from dataclasses import asdict as dataclasses_asdict
 
 from stexs.domain import model
 from stexs.domain.broker import OrderScreeningException
-from stexs.services.exchange import Exchange
 from stexs.services import orderbook
+from stexs.services.exchange import Exchange
 import stexs.io.persistence as iop
-from dataclasses import asdict as dataclasses_asdict
 
 #TODO Will need to mock/test the sockety stuff eventually
 class TestSocketClient():
     pass
 
 @pytest.fixture
-def exchange():
+def patched_exchange():
     stex = Exchange()
 
     # Clear orders
@@ -51,50 +51,48 @@ def exchange():
 
     return stex
 
+def test_message_transaction_set(patched_exchange):
+    patched_exchange.recv({"txid": 1, "message_type": "test"})
+    patched_exchange.recv({"txid": 800, "message_type": "test"})
+    patched_exchange.recv({"txid": 2, "message_type": "test"})
+    patched_exchange.recv({"txid": 808, "message_type": "test"})
+    assert patched_exchange.txid_set == set([1, 800, 2, 808])
 
 
-def test_message_transaction_set(exchange):
-    exchange.recv({"txid": 1, "message_type": "test"})
-    exchange.recv({"txid": 800, "message_type": "test"})
-    exchange.recv({"txid": 2, "message_type": "test"})
-    exchange.recv({"txid": 808, "message_type": "test"})
-    assert exchange.txid_set == set([1, 800, 2, 808])
-
-
-def test_message_unknown_message_type(exchange):
-    r = exchange.recv({"txid": 1, "message_type": "invalid"})
+def test_message_unknown_message_type(patched_exchange):
+    r = patched_exchange.recv({"txid": 1, "message_type": "invalid"})
     assert r["response_code"] == 1
     assert r["response_type"] == "exception"
     assert r["msg"] == "unknown message_type"
 
 
-def test_message_duplicate_transaction(exchange):
-    exchange.txid_set.add(1)
+def test_message_duplicate_transaction(patched_exchange):
+    patched_exchange.txid_set.add(1)
     msg = {"txid": 1, "message_type": "test"}
 
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_code"] == 1
     assert r["response_type"] == "exception"
     assert r["msg"] == "duplicate transaction"
 
 
-def test_message_stale_transaction(exchange):
+def test_message_stale_transaction(patched_exchange):
     stale_ts = int(time.time()) - 100
     msg = {"txid": 1, "message_type": "test", "sender_ts": stale_ts}
 
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_code"] == 1
     assert r["response_type"] == "exception"
     assert r["msg"] == "stale transaction"
 
 
-def test_list_stocks(exchange):
+def test_list_stocks(patched_exchange):
     msg = {"txid": 1, "message_type": "list_stocks"}
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r == sorted(["TEST", "STI."])
 
 
-def test_add_order_ok(exchange):
+def test_add_order_ok(patched_exchange):
     msg = {
         "txid": 1,
         "message_type": "new_order",
@@ -106,13 +104,13 @@ def test_add_order_ok(exchange):
         "volume": 100,
         "sender_ts": int(time.time()),
     }
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "new_order"
     assert r["response_code"] == 0
     assert r["msg"] == "ok"
 
 
-def test_add_order_bad_validate(exchange):
+def test_add_order_bad_validate(patched_exchange):
     msg = {
         "txid": 1,
         "message_type": "new_order",
@@ -124,13 +122,13 @@ def test_add_order_bad_validate(exchange):
         "volume": 100,
         "sender_ts": int(time.time()),
     }
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "exception"
     assert r["response_code"] == 77
     assert r["msg"] == "Insufficient holdings"
 
 
-def test_add_order_explode_validate(exchange):
+def test_add_order_explode_validate(patched_exchange):
     msg = {
         "txid": 1,
         "message_type": "new_order",
@@ -142,13 +140,13 @@ def test_add_order_explode_validate(exchange):
         "volume": 100,
         "sender_ts": int(time.time()),
     }
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "exception"
     assert r["response_code"] == 70
     assert r["msg"] == "bang"
 
 
-def test_add_order_unknown_broker(exchange):
+def test_add_order_unknown_broker(patched_exchange):
     msg = {
         "txid": 1,
         "message_type": "new_order",
@@ -160,13 +158,13 @@ def test_add_order_unknown_broker(exchange):
         "volume": 100,
         "sender_ts": int(time.time()),
     }
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "exception"
     assert r["response_code"] == 404
     assert r["msg"] == "malformed broker"
 
 
-def test_add_order_unknown_user(exchange):
+def test_add_order_unknown_user(patched_exchange):
     msg = {
         "txid": 1,
         "message_type": "new_order",
@@ -178,13 +176,13 @@ def test_add_order_unknown_user(exchange):
         "volume": 100,
         "sender_ts": int(time.time()),
     }
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "exception"
     assert r["response_code"] == 404
     assert r["msg"] == "unknown user"
 
 
-def test_add_order_unknown_stock(exchange):
+def test_add_order_unknown_stock(patched_exchange):
     msg = {
         "txid": 1,
         "message_type": "new_order",
@@ -196,22 +194,22 @@ def test_add_order_unknown_stock(exchange):
         "volume": 100,
         "sender_ts": int(time.time()),
     }
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "exception"
     assert r["response_code"] == 404
     assert r["msg"] == "unknown symbol"
 
 
-def test_instrument_summary_unknown_stock(exchange):
+def test_instrument_summary_unknown_stock(patched_exchange):
     msg = {"txid": 1, "message_type": "instrument_summary", "symbol": "TSI."}
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "exception"
     assert r["response_code"] == 404
     assert r["msg"] == "unknown symbol"
 
 
 # TODO Should probably mock the stall here and test it properly somewhere else but we're going to delete it soon
-def test_format_instrument_summary(exchange):
+def test_format_instrument_summary(patched_exchange):
     stall = model.MarketStall(stock=model.Stock(symbol="STI.", name="Sam and Tom Industrys"))
     price = 1.25
     stall.min_price = 1.00
@@ -232,7 +230,7 @@ def test_format_instrument_summary(exchange):
     stall.n_trades = 10
     stall.v_trades = 100
 
-    summary = exchange.format_instrument_summary(stall)
+    summary = patched_exchange.format_instrument_summary(stall)
     #assert summary["response_type"] == "instrument_summary"
     #assert summary["response_code"] == 0
     #assert summary["msg"] == "ok"
@@ -249,24 +247,24 @@ def test_format_instrument_summary(exchange):
     assert summary["last_trade_ts"] == ts
 
 
-def test_instrument_summary(exchange):
+def test_instrument_summary(patched_exchange):
     msg = {"txid": 1, "message_type": "instrument_summary", "symbol": "STI."}
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "instrument_summary"
     assert r["response_code"] == 0
     assert r["msg"] == "ok"
 
 
-def test_instrument_trade_history_unknown_stock(exchange):
+def test_instrument_trade_history_unknown_stock(patched_exchange):
     msg = {"txid": 1, "message_type": "instrument_trade_history", "symbol": "TSI."}
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "exception"
     assert r["response_code"] == 404
     assert r["msg"] == "unknown symbol"
 
 
 # Again, belongs in a test suite for marketstall, but we're gonna get rid of it soon
-def test_format_instrument_trade_history(exchange):
+def test_format_instrument_trade_history(patched_exchange):
     stall = model.MarketStall(stock=model.Stock(symbol="STI.", name="Sam and Tom Industrys"))
     trade = model.Trade(
         tid="12345",
@@ -279,12 +277,12 @@ def test_format_instrument_trade_history(exchange):
     )
     stall.log_trade(trade)
 
-    trade_history = exchange.get_trade_history(stall)
+    trade_history = patched_exchange.get_trade_history(stall)
     assert trade_history == [dataclasses_asdict(trade)]
 
-def test_instrument_trade_history_empty(exchange):
+def test_instrument_trade_history_empty(patched_exchange):
     msg = {"txid": 1, "message_type": "instrument_trade_history", "symbol": "STI."}
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "instrument_trade_history"
     assert r["response_code"] == 0
     assert r["msg"] == "ok"
@@ -292,20 +290,20 @@ def test_instrument_trade_history_empty(exchange):
     assert r["trade_history"] == []
 
 
-def test_instrument_orderbook_summary_unknown_stock(exchange):
+def test_instrument_orderbook_summary_unknown_stock(patched_exchange):
     msg = {"txid": 1, "message_type": "instrument_orderbook_summary", "symbol": "TSI."}
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "exception"
     assert r["response_code"] == 404
     assert r["msg"] == "unknown symbol"
 
 
 # We have already tested orderbook.summarise_books_for_symbol
-def test_format_instrument_orderbook_summary(exchange):
+def test_format_instrument_orderbook_summary(patched_exchange):
     summary = orderbook.summarise_books_for_symbol("STI.")
 
     msg = {"txid": 1, "message_type": "instrument_orderbook_summary", "symbol": "STI."}
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "instrument_orderbook_summary"
     assert r["response_code"] == 0
     assert r["msg"] == "ok"
@@ -319,9 +317,9 @@ def test_format_instrument_orderbook_summary(exchange):
     assert r["current_sell"] == str(summary["sell"])
 
 
-def test_instrument_orderbook_unknown_stock(exchange):
+def test_instrument_orderbook_unknown_stock(patched_exchange):
     msg = {"txid": 1, "message_type": "instrument_orderbook", "symbol": "TSI."}
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "exception"
     assert r["response_code"] == 404
     assert r["msg"] == "unknown symbol"
@@ -329,11 +327,11 @@ def test_instrument_orderbook_unknown_stock(exchange):
 
 # We have already tested orderbook.get_serialised_order_books_for_symbol
 # TODO Test with n=10 properly
-def test_format_instrument_orderbook_empty(exchange):
+def test_format_instrument_orderbook_empty(patched_exchange):
     order_books = orderbook.get_serialised_order_books_for_symbol("STI.", n=10)
 
     msg = {"txid": 1, "message_type": "instrument_orderbook", "symbol": "STI."}
-    r = exchange.recv(msg)
+    r = patched_exchange.recv(msg)
     assert r["response_type"] == "instrument_orderbook"
     assert r["response_code"] == 0
     assert r["msg"] == "ok"

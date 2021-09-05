@@ -44,15 +44,15 @@ class Broker:
         with uow:
             if not executed:
                 for order in buy_orders:
-                    self.adjust_balance(order.csid, order.price * order.volume * -1)
+                    self.adjust_balance(order.csid, order.price * order.volume * -1, uow=uow)
                 for order in sell_orders:
-                    self.adjust_holding(order.csid, order.symbol, order.volume * -1)
+                    self.adjust_holding(order.csid, order.symbol, order.volume * -1, uow=uow)
             else:
                 for order in buy_orders:
-                    self.adjust_holding(order.csid, order.symbol, order.volume)
+                    self.adjust_holding(order.csid, order.symbol, order.volume, uow=uow)
                 for order in sell_orders:
                     # CRIT TODO Check this works with splits
-                    self.adjust_balance(order.csid, order.price * order.volume)
+                    self.adjust_balance(order.csid, order.price * order.volume, uow=uow)
             uow.commit()
 
     def adjust_balance(self, csid, adjust_balance, uow=None):

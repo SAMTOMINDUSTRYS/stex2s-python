@@ -75,42 +75,41 @@ def test_domain_screen_sell_bad_holding(client):
 # Service
 
 @pytest.fixture
-def uow():
+def broker():
+    broker = Broker("MAGENTA", "Magenta Holdings Corporation")
+    broker.user_uow = None # helps find uow not getting passed around
+    return broker
+
+@pytest.fixture
+def broker_uow():
     repo = iop.base.GenericMemoryRepository(prefix="clients")
-    repo.store.clear()
-    repo.store._clear()
     repo.store._store._objects["clients"] = {}
     repo.store._store._objects["clients"]["1"] = Client(csid="1", name="Sam", balance=100, holdings={"STI.": 100})
     repo.store._store._versions["clients>1"] = 1
+    repo.store.clear() # clear staging
     return iop.user.MemoryClientUoW # uses the GMR
 
-@pytest.fixture
-def broker(uow):
-    broker = Broker("MAGENTA", "Magenta Holdings Corporation")
-    broker.user_uow = uow
-    return broker
+def test_service_get_unknown_user(broker, broker_uow):
+    assert broker.get_user("8", uow=broker_uow()) is None
 
-def test_service_get_unknown_user(broker, uow):
-    assert broker.get_user("8", uow=uow()) is None
-
-def test_service_get_known_user(broker, uow):
-    user = broker.get_user("1", uow=uow())
+def test_service_get_known_user(broker, broker_uow):
+    user = broker.get_user("1", uow=broker_uow())
     assert user.csid == "1"
     assert user.name == "Sam"
     assert user.balance == 100
     assert user.holdings == {"STI.": 100}
 
-def test_add_and_get_user(broker, uow):
+def test_add_and_get_user(broker, broker_uow):
     broker.add_users([
         Client(csid="2", name="Tom"),
         Client(csid="3", name="Sammy"),
         Client(csid="4", name="Daisy"),
-    ], uow=uow())
+    ], uow=broker_uow())
 
-    with uow() as test_uow:
+    with broker_uow() as test_uow:
         assert len(test_uow.users.store._store._objects["clients"]) == 4
 
-    with uow() as test_uow:
+    with broker_uow() as test_uow:
         sam = test_uow.users.get("2")
         assert sam.csid == "2"
         assert sam.name == "Tom"
@@ -120,46 +119,46 @@ def test_update_users():
     pass
 
 
-def test_service_adjust_balance(broker, uow):
-    with uow() as test_uow:
+def test_service_adjust_balance(broker, broker_uow):
+    with broker_uow() as test_uow:
         client = test_uow.users.get("1")
         balance = client.balance
         broker.adjust_balance("1", 100, uow=test_uow)
         assert client.balance == 200
 
-    with uow() as test_uow:
+    with broker_uow() as test_uow:
         client = test_uow.users.get("1")
         assert client.balance == 200
 
-    with uow() as test_uow:
+    with broker_uow() as test_uow:
         client = test_uow.users.get("1")
         balance = client.balance
         broker.adjust_balance("1", -100, uow=test_uow)
         assert client.balance == 100
 
-    with uow() as test_uow:
+    with broker_uow() as test_uow:
         client = test_uow.users.get("1")
         assert client.balance == 100
 
 
-def test_service_adjust_holding(broker, uow):
-    with uow() as test_uow:
+def test_service_adjust_holding(broker, broker_uow):
+    with broker_uow() as test_uow:
         client = test_uow.users.get("1")
         holding = client.holdings["STI."]
         broker.adjust_holding("1", "STI.", 100, uow=test_uow)
         assert client.holdings["STI."] == 200
 
-    with uow() as test_uow:
+    with broker_uow() as test_uow:
         client = test_uow.users.get("1")
         assert client.holdings["STI."] == 200
 
-    with uow() as test_uow:
+    with broker_uow() as test_uow:
         client = test_uow.users.get("1")
         holding = client.holdings["STI."]
         broker.adjust_holding("1", "STI.", -100, uow=test_uow)
         assert client.holdings["STI."] == 100
 
-    with uow() as test_uow:
+    with broker_uow() as test_uow:
         client = test_uow.users.get("1")
         assert client.holdings["STI."] == 100
 
@@ -188,53 +187,53 @@ def test_service_validate_preorder_ok(broker):
 # Note test_service_simple_update_users does not check business rules around
 # buys/sells executing together, splits or anything handled by execute_trade
 # These tests merely check the right accounting is done on the user
-def test_service_simple_update_users_buy(broker, uow):
+def test_service_simple_update_users_buy(broker, broker_uow):
     buys = [
         Order(txid=1, csid="1", ts=0, side="BUY", symbol="STI.", price=1, volume=100)
     ]
     sells = [
     ]
-    broker.update_users(buys, sells, uow=uow())
+    broker.update_users(buys, sells, uow=broker_uow())
 
-    with uow() as test_uow:
+    with broker_uow() as test_uow:
         client = test_uow.users.get("1")
         assert client.balance == 0
 
-def test_service_simple_update_users_sell(broker, uow):
+def test_service_simple_update_users_sell(broker, broker_uow):
     buys = [
     ]
     sells = [
         Order(txid=1, csid="1", ts=0, side="SELL", symbol="STI.", price=1, volume=100)
     ]
-    broker.update_users(buys, sells, uow=uow())
+    broker.update_users(buys, sells, uow=broker_uow())
 
-    with uow() as test_uow:
+    with broker_uow() as test_uow:
         client = test_uow.users.get("1")
         assert client.holdings["STI."] == 0
 
-def test_service_simple_update_users_buy_executed(broker, uow):
+def test_service_simple_update_users_buy_executed(broker, broker_uow):
     buys = [
         Order(txid=1, csid="1", ts=0, side="BUY", symbol="STI.", price=1, volume=100)
     ]
     sells = [
     ]
-    broker.update_users(buys, sells, executed=True, uow=uow())
+    broker.update_users(buys, sells, executed=True, uow=broker_uow())
 
-    with uow() as test_uow:
+    with broker_uow() as test_uow:
         client = test_uow.users.get("1")
         assert client.holdings["STI."] == 200
 
-def test_service_simple_update_users_sell_executed(broker, uow):
+def test_service_simple_update_users_sell_executed(broker, broker_uow):
     buys = [
     ]
     sells = [
         Order(txid=1, csid="1", ts=0, side="SELL", symbol="STI.", price=1, volume=100)
     ]
-    broker.update_users(buys, sells, executed=True, uow=uow())
+    broker.update_users(buys, sells, executed=True, uow=broker_uow())
 
-    with uow() as test_uow:
+    with broker_uow() as test_uow:
         client = test_uow.users.get("1")
         assert client.balance == 200
 
-def test_service_simple_update_users_buy_aborted(broker, uow):
+def test_service_simple_update_users_buy_aborted(broker, broker_uow):
     pass

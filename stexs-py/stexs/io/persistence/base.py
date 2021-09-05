@@ -151,6 +151,17 @@ class GenericVersionedMemoryDictWrapper():
         self._staged_objects.clear()
         self._staged_versions.clear()
 
+    def clear_prefix(self, prefix):
+        to_del = ["%s>%s" % (prefix, str(kid)) for kid in self._store._objects[prefix]]
+        for k in to_del:
+            del self._store._versions[k]
+
+            if k in self._staged_objects:
+                del self._staged_objects[k]
+                del self._staged_versions[k]
+        del self._store._objects[prefix]
+
+
     def _clear(self):
         self._store._objects.clear()
         self._store._versions.clear()
@@ -172,6 +183,9 @@ class GenericMemoryRepository(AbstractRepository):
     def get(self, obj_id: str):
         obj_id = self.get_obj_id(obj_id)
         return self.store._get(obj_id)
+
+    def clear(self):
+        self.store.clear_prefix(self.prefix)
 
     def list(self):
         return set(self.store._list(self.prefix))

@@ -94,7 +94,7 @@ def propose_trade(buy: Order, sells: List[Order], excess=0):
     return model.Trade.propose_trade(buy, sells, excess)
 
 
-def split_sell(filled_sell: Order, excess_volume: int, uow=None):
+def split_sell(filled_sell: Order, excess_volume: int):
     filled_sell, remainder_sell = Order.split_sell(filled_sell, excess_volume)
     return filled_sell, remainder_sell
 
