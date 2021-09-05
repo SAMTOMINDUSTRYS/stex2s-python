@@ -1,7 +1,6 @@
 from stexs.domain.broker import (
     Client,
-    InsufficientBalanceException,
-    InsufficientHoldingException,
+    OrderScreeningException,
 )
 from stexs.services.logger import log
 import stexs.io.persistence as iop
@@ -32,15 +31,10 @@ class Broker:
             uow.commit()
 
     def validate_preorder(self, user, order):
-        if order.side == "BUY":
-            if order.price * order.volume > user.balance:
-                raise InsufficientBalanceException("Insufficient balance")
-        elif order.side == "SELL":
-            if order.symbol not in user.holdings:
-                raise InsufficientHoldingException("Insufficient holding")
-            else:
-                if user.holdings[order.symbol] < order.volume:
-                    raise InsufficientHoldingException("Insufficient holding")
+        try:
+            user.screen_order(order.side, order.symbol, order.price, order.volume)
+        except OrderScreeningException as e:
+            raise e
 
     def update_users(self, buy_orders, sell_orders, executed=False):
         with self.user_uow() as uow:

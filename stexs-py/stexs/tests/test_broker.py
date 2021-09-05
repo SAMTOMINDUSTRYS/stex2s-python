@@ -1,6 +1,10 @@
 import pytest
 
-from stexs.domain.broker import Client
+from stexs.domain.broker import (
+    Client,
+    InsufficientBalanceException,
+    InsufficientHoldingException,
+)
 from stexs.services.broker import Broker
 import stexs.io.persistence as iop
 
@@ -12,7 +16,7 @@ import stexs.io.persistence as iop
 
 @pytest.fixture
 def client():
-    return Client(csid="1", name="Sam", balance=0, holdings={"STI.": 100})
+    return Client(csid="1", name="Sam", balance=100, holdings={"STI.": 100})
 
 def test_domain_adjust_balance_up(client):
     current_balance = client.balance
@@ -43,6 +47,28 @@ def test_domain_adjust_holding_existing_down(client):
     adjustment = -100
     client.adjust_holding("STI.", adjustment)
     assert client.holdings["STI."] == (current_holding + adjustment)
+
+def test_domain_screen_buy_ok(client):
+    for buy_price in [1, 100]:
+        assert client.screen_order("BUY", "STI.", buy_price, 1)
+
+def test_domain_screen_buy_bad_balance(client):
+    for buy_price in [101, 1000]:
+        with pytest.raises(InsufficientBalanceException, match="Insufficient balance"):
+            client.screen_order("BUY", "STI.", buy_price, 1)
+
+def test_domain_screen_sell_ok(client):
+    for sell_volume in [1, 100]:
+        assert client.screen_order("SELL", "STI.", 1, sell_volume)
+
+def test_domain_screen_sell_bad_volume(client):
+    for sell_volume in [101, 1000]:
+        with pytest.raises(InsufficientHoldingException, match="Insufficient holding"):
+            client.screen_order("SELL", "STI.", 1, sell_volume)
+
+def test_domain_screen_sell_bad_holding(client):
+    with pytest.raises(InsufficientHoldingException, match="No holding"):
+        client.screen_order("SELL", "TSI.", 1, 1)
 
 ###############################################################################
 # Service

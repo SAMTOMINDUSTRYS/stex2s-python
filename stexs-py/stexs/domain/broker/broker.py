@@ -1,3 +1,7 @@
+from .broker_exception import (
+    InsufficientBalanceException,
+    InsufficientHoldingException,
+)
 from dataclasses import dataclass, field
 from typing import List, Dict
 
@@ -22,3 +26,15 @@ class Client:
             self.holdings[symbol] = 0
         self.holdings[symbol] += adjust_qty
 
+    def screen_order(self, side, symbol, price, volume):
+        if side == "BUY":
+            if price * volume > self.balance:
+                raise InsufficientBalanceException("Insufficient balance")
+        elif side == "SELL":
+            if symbol not in self.holdings:
+                raise InsufficientHoldingException("No holding")
+            else:
+                if self.holdings[symbol] < volume:
+                    raise InsufficientHoldingException("Insufficient holding")
+        return True
+    
