@@ -141,7 +141,7 @@ def test_service_adjust_balance(broker, uow):
         assert client.balance == 100
 
 
-def test_service_adjust_balance(broker, uow):
+def test_service_adjust_holding(broker, uow):
     with uow() as test_uow:
         client = test_uow.users.get("1")
         holding = client.holdings["STI."]
@@ -162,3 +162,8 @@ def test_service_adjust_balance(broker, uow):
         client = test_uow.users.get("1")
         assert client.holdings["STI."] == 100
 
+def test_service_validate_preorder(broker):
+    pass
+
+def test_service_validate_preorder(broker):
+    pass
