@@ -1,5 +1,6 @@
 from stexs.domain import model
 from stexs.domain.order import Order
+from stexs.domain.broker import OrderScreeningException
 from stexs.services.logger import log
 from stexs.services import orderbook
 import stexs.io.persistence as iop
@@ -74,6 +75,7 @@ class Exchange:
         # TODO CRIT https://github.com/SAMTOMINDUSTRYS/stex2s-python/issues/2
         price = float(msg["price"])
 
+        #TODO CRIT Order vol > 0
         order = Order(
             txid=msg["txid"],
             csid=msg["account_id"],
@@ -96,9 +98,14 @@ class Exchange:
         # Check this order can be completed before processing it
         # Good transaction isolation is going to be needed to ensure balance
         # and holdings stay positive in the event of concurrent order handlers
-        # TODO Catch domain exceptions properly
         try:
             self.brokers[msg["broker_id"]].validate_preorder(user, order)
+        except OrderScreeningException as e:
+            return {
+                "response_type": "exception",
+                "response_code": 77,
+                "msg": str(e),
+            }
         except Exception as e:
             return {
                 "response_type": "exception",

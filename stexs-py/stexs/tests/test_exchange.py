@@ -2,6 +2,7 @@ import pytest
 import time
 
 from stexs.domain import model
+from stexs.domain.broker import OrderScreeningException
 from stexs.services.exchange import Exchange
 from stexs.services import orderbook
 import stexs.io.persistence as iop
@@ -32,9 +33,17 @@ def exchange():
     # Mock broker
     class BasicBroker:
         def get_user(self, account_id):
-            return account_id if account_id == 1 else None
+            return account_id if account_id in [1, 999] else None
         def validate_preorder(self, user, order):
-            return True
+            if order.csid == 999:
+                raise Exception("bang")
+            elif order.side == "BUY":
+                return True
+            else:
+                # Simulate Exception for any SELL
+                raise OrderScreeningException("Insufficient holdings")
+
+            return False
         def update_users(self, buys, sells, executed):
             return True
     stex.brokers["MAGENTA"] = BasicBroker()
@@ -100,6 +109,42 @@ def test_add_order_ok(exchange):
     assert r["response_type"] == "new_order"
     assert r["response_code"] == 0
     assert r["msg"] == "ok"
+
+
+def test_add_order_bad_validate(exchange):
+    msg = {
+        "txid": 1,
+        "message_type": "new_order",
+        "broker_id": "MAGENTA",
+        "account_id": 1,
+        "side": "SELL",
+        "symbol": "STI.",
+        "price": "1.01",
+        "volume": 100,
+        "sender_ts": int(time.time()),
+    }
+    r = exchange.recv(msg)
+    assert r["response_type"] == "exception"
+    assert r["response_code"] == 77
+    assert r["msg"] == "Insufficient holdings"
+
+
+def test_add_order_explode_validate(exchange):
+    msg = {
+        "txid": 1,
+        "message_type": "new_order",
+        "broker_id": "MAGENTA",
+        "account_id": 999,
+        "side": "BUY",
+        "symbol": "STI.",
+        "price": "1.01",
+        "volume": 100,
+        "sender_ts": int(time.time()),
+    }
+    r = exchange.recv(msg)
+    assert r["response_type"] == "exception"
+    assert r["response_code"] == 70
+    assert r["msg"] == "bang"
 
 
 def test_add_order_unknown_broker(exchange):
