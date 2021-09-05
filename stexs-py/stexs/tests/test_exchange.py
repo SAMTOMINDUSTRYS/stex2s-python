@@ -131,7 +131,7 @@ def test_add_order_unknown_user(exchange):
     assert r["msg"] == "unknown user"
 
 
-def test_add_order_bad_stock(exchange):
+def test_add_order_unknown_stock(exchange):
     msg = {
         "txid": 1,
         "message_type": "new_order",
@@ -146,4 +146,60 @@ def test_add_order_bad_stock(exchange):
     r = exchange.recv(msg)
     assert r["response_type"] == "exception"
     assert r["response_code"] == 404
-    assert r["msg"] == "unknown instrument"
+    assert r["msg"] == "unknown symbol"
+
+
+def test_instrument_summary_unknown_stock(exchange):
+    msg = {"txid": 1, "message_type": "instrument_summary", "symbol": "TSI."}
+    r = exchange.recv(msg)
+    assert r["response_type"] == "exception"
+    assert r["response_code"] == 404
+    assert r["msg"] == "unknown symbol"
+
+
+# TODO Should probably mock the stall but we're going to delete it soon
+def test_format_instrument_summary(exchange):
+    stall = model.MarketStall(stock=model.Stock(symbol="STI.", name="Sam and Tom Industrys"))
+    price = 1.25
+    stall.min_price = 1.00
+    stall.max_price = price
+
+    ts = int(time.time())
+    stall.log_trade(
+        model.Trade(
+            tid="12345",
+            symbol="STI.",
+            buy_txid=1,
+            total_price=price*100,
+            avg_price=price,
+            volume=100,
+            ts=ts,
+        )
+    )
+    stall.n_trades = 10
+    stall.v_trades = 100
+
+    summary = exchange.format_instrument_summary(stall)
+    #assert summary["response_type"] == "instrument_summary"
+    #assert summary["response_code"] == 0
+    #assert summary["msg"] == "ok"
+    assert summary["opening_price"] is None
+    assert summary["closing_price"] is None
+    assert summary["min_price"] == "1.0"
+    assert summary["max_price"] == str(price)
+    assert summary["num_trades"] == 10
+    assert summary["vol_trades"] == 100
+    assert summary["name"] == "Sam and Tom Industrys"
+    assert summary["symbol"] == "STI."
+    assert summary["last_trade_price"] == str(price)
+    assert summary["last_trade_volume"] == 100
+    assert summary["last_trade_ts"] == ts
+
+
+def test_instrument_summary(exchange):
+    msg = {"txid": 1, "message_type": "instrument_summary", "symbol": "STI."}
+    r = exchange.recv(msg)
+    assert r["response_type"] == "instrument_summary"
+    assert r["response_code"] == 0
+    assert r["msg"] == "ok"
+

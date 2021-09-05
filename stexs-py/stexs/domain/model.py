@@ -38,7 +38,7 @@ class Trade:
     volume: int
     closed: bool = False
     excess: int = 0 # TODO CRIT Cheeky way of keeping size of excess last sell
-    sell_txids: List[str] = field(default_factory = List)
+    sell_txids: List[str] = field(default_factory = list)
 
     @staticmethod
     def propose_trade(filled_buy: "Order", filled_sells: "Order", excess: int):

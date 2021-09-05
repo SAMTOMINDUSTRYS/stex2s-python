@@ -90,7 +90,7 @@ class Exchange:
                 return {
                     "response_type": "exception",
                     "response_code": 404,
-                    "msg": "unknown instrument",
+                    "msg": "unknown symbol",
                 }
 
         # Check this order can be completed before processing it
@@ -141,6 +141,27 @@ class Exchange:
     def clear_trade(self):
         pass
 
+    def format_instrument_summary(self, stall):
+        reply = {
+            "opening_price": None,
+            "closing_price": None,
+            "min_price": str(stall.min_price) if stall.min_price else None, # TODO CRIT str
+            "max_price": str(stall.max_price) if stall.max_price else None,
+            "num_trades": stall.n_trades,
+            "vol_trades": stall.v_trades,
+            "name": stall.stock.name,
+            "symbol": stall.stock.symbol,
+            "last_trade_price": None,
+            "last_trade_volume": None,
+            "last_trade_ts": None,
+        }
+        if len(stall.order_history) > 0:
+            last_trade = stall.order_history[-1]
+            reply["last_trade_price"] = str(last_trade.avg_price) # TODO CRIT str
+            reply["last_trade_volume"] = last_trade.volume
+            reply["last_trade_ts"] = last_trade.ts
+        return reply
+
     def recv(self, msg):
         if "txid" in msg:
             if msg["txid"] in self.txid_set:
@@ -175,34 +196,19 @@ class Exchange:
                 except AttributeError:
                     reply = {
                         "response_type": "exception",
-                        "response_code": 1,
+                        "response_code": 404,
                         "msg": "unknown symbol",
                     }
                     ok = False
 
                 if ok:
-                    stall = self.stalls[symbol]
-                    reply = {
-                        "response_type": "instrument_summary",
-                        "response_code": 0,
-                        "msg": "ok",
-                        "opening_price": None,
-                        "closing_price": None,
-                        "min_price": str(stall.min_price) if stall.min_price else None, # TODO CRIT str
-                        "max_price": str(stall.max_price) if stall.max_price else None,
-                        "num_trades": stall.n_trades,
-                        "vol_trades": stall.v_trades,
-                        "name": stall.stock.name,
-                        "symbol": stall.stock.symbol,
-                        "last_trade_price": None,
-                        "last_trade_volume": None,
-                        "last_trade_ts": None,
-                    }
-                    if len(stall.order_history) > 0:
-                        last_trade = stall.order_history[-1]
-                        reply["last_trade_price"] = str(last_trade.avg_price) # TODO CRIT str
-                        reply["last_trade_volume"] = last_trade.volume
-                        reply["last_trade_ts"] = last_trade.ts
+                    reply = self.format_instrument_summary(self.stalls[symbol])
+                    if reply:
+                        reply.update({
+                            "response_type": "instrument_summary",
+                            "response_code": 0,
+                            "msg": "ok",
+                        })
                     log.critical(reply)
 
         elif msg["message_type"] == "instrument_trade_history":
