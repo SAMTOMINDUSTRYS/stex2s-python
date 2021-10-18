@@ -31,7 +31,7 @@ class Trade:
     sell_txids: List[str] = field(default_factory = list)
 
     @staticmethod
-    def propose_trade(filled_buy: "Order", filled_sells: "Order", excess: int):
+    def propose_trade(filled_buy: "Order", filled_sells: "Order", excess: int = 0, execution_price: float = None):
         # Calculate average price of fulfilled buy
         tot_price = 0
         sell_txids = []
@@ -42,6 +42,10 @@ class Trade:
                 tot_price += (sell.price * (sell.volume - excess))
             else:
                 tot_price += (sell.price * sell.volume)
+
+        if execution_price:
+            avg_price = execution_price
+            tot_price = execution_price * filled_buy.volume
 
         return Trade(
             tid=str(uuid.uuid4())[:5],

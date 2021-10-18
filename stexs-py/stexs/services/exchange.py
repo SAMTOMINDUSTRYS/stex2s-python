@@ -123,7 +123,7 @@ class Exchange:
         # Repeat trading until no trades are left
         while True:
             # Need to handle the market tick async from messages but this will do for now
-            proposed_trades = orderbook.match_orderbook(symbol)
+            proposed_trades = orderbook.match_orderbook(symbol, reference_price=self.stalls[symbol].last_price)
             if len(proposed_trades) == 0:
                 break
 

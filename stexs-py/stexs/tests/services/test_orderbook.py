@@ -194,6 +194,7 @@ def test_match_skips_on_closed_sell():
     assert trades[0].sell_txids == ["3"]
 
 
+"""
 # Test the match_orderbook process returns a Trade matching expectations
 # Not necessarily testing the matcher itself
 def test_match_orderbook():
@@ -211,6 +212,7 @@ def test_match_orderbook():
 
     actual_trade.tid = expected_trade.tid # Hack to ignore auto-ID name
     assert expected_trade == actual_trade
+"""
 
 
 # test_order tests the function of split_sell, here we just want to check the orderbook wrapper works

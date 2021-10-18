@@ -42,7 +42,7 @@ def close_txids(txids: List[str], uow=None):
         _close_txids(txids, uow)
         uow.commit()
 
-def match_one(buy_book, sell_book):
+def match_one(buy_book, sell_book, highest_bid=None, lowest_ask=None, reference_price=None):
     done = False
 
     proposed_trades = []
@@ -76,10 +76,24 @@ def match_one(buy_book, sell_book):
             curr_volume += sell_volume
             buy_sells.append(sell)
 
+            # Determine price
+            if reference_price or (highest_bid and lowest_ask):
+                # TODO What about multiple orders?
+                if buy.ts < sell.ts:
+                    # If the sell is newer, it sells at the highest existing buy
+                    execution_price = highest_bid
+                else:
+                    # If the buy is newer (or equal), it buys at the lowest existing sell
+                    execution_price = lowest_ask
+            else:
+                # Keep old tests from non t7 suite passing
+                execution_price = None
+
+
             if curr_volume >= buy_volume:
                 # Either volume is just right or there is some excess to split into new Order
                 proposed_trades.append(
-                        propose_trade(buy, buy_sells, excess=curr_volume - buy_volume)
+                        propose_trade(buy, buy_sells, excess=curr_volume - buy_volume, execution_price=execution_price)
                 )
                 done = True # Force update before running match again
                 break # Don't keep trying to add sells to this buy!
@@ -90,8 +104,8 @@ def match_one(buy_book, sell_book):
     return proposed_trades
 
 
-def propose_trade(buy: Order, sells: List[Order], excess=0):
-    return model.Trade.propose_trade(buy, sells, excess)
+def propose_trade(buy: Order, sells: List[Order], excess=0, execution_price=None):
+    return model.Trade.propose_trade(buy, sells, excess, execution_price)
 
 
 def split_sell(filled_sell: Order, excess_volume: int):
@@ -185,6 +199,7 @@ def summarise_books_for_symbol(symbol, uow=None):
         buy_book = uow.orders.get_buy_book_for_symbol(symbol)
         sell_book = uow.orders.get_sell_book_for_symbol(symbol)
 
+        # TODO This won't work for market orders
         try:
             buy = buy_book[0].price
         except:
@@ -197,7 +212,7 @@ def summarise_books_for_symbol(symbol, uow=None):
 
         return summarise_books(buy_book, sell_book, buy=buy, sell=sell)
 
-def match_orderbook(symbol, uow=None):
+def match_orderbook(symbol, uow=None, reference_price=None):
     if not uow:
         uow = _default_uow()
     # Trigger match process
@@ -206,5 +221,6 @@ def match_orderbook(symbol, uow=None):
     with uow:
         buy_book = uow.orders.get_buy_book_for_symbol(symbol)
         sell_book = uow.orders.get_sell_book_for_symbol(symbol)
-        return match_one(buy_book, sell_book)
+        summary = summarise_books_for_symbol(symbol, uow=uow)
+        return match_one(buy_book, sell_book, highest_bid=summary["buy"], lowest_ask=summary["sell"], reference_price=reference_price)
 
