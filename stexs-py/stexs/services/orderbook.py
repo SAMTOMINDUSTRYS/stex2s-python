@@ -42,7 +42,21 @@ def close_txids(txids: List[str], uow=None):
         _close_txids(txids, uow)
         uow.commit()
 
-def match_one(buy_book, sell_book, highest_bid=None, lowest_ask=None, reference_price=None):
+def match_one(buy_book, sell_book, reference_price=None):
+
+    highest_bid = None
+    lowest_ask = None
+
+    if reference_price:
+        for buy in buy_book:
+            if buy.price != float("inf"):
+                highest_bid = buy.price
+                break
+        for sell in sell_book:
+            if sell.price != float("-inf"):
+                lowest_ask = sell.price
+                break
+
     done = False
 
     proposed_trades = []
@@ -267,18 +281,5 @@ def match_orderbook(symbol, uow=None, reference_price=None):
     with uow:
         buy_book = uow.orders.get_buy_book_for_symbol(symbol)
         sell_book = uow.orders.get_sell_book_for_symbol(symbol)
-        summary = summarise_books_for_symbol(symbol, reference_price=reference_price, uow=uow)
-
-        highest_bid = None
-        for buy in buy_book:
-            if buy.price != float("inf"):
-                highest_bid = buy.price
-                break
-        lowest_ask = None
-        for sell in sell_book:
-            if sell.price != float("-inf"):
-                lowest_ask = sell.price
-                break
-
-        return match_one(buy_book, sell_book, highest_bid=highest_bid, lowest_ask=lowest_ask, reference_price=reference_price)
+        return match_one(buy_book, sell_book, reference_price=reference_price)
 

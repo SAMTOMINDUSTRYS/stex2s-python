@@ -7,7 +7,7 @@ from stexs.domain.order import (
 from stexs.services import orderbook
 
 def wrap_service_match_one(buys, sells, bid=None, ask=None, ref=None):
-    return orderbook.match_one(buys, sells, highest_bid=bid, lowest_ask=ask, reference_price=ref)
+    return orderbook.match_one(buys, sells, reference_price=ref)
 
 def _attempt_test_trade(orders, reference_price=None, expected_trades=1):
     buys = []
