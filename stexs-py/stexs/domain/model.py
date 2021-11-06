@@ -67,7 +67,7 @@ class Trade:
 @dataclass
 class MarketStall:
     stock: Stock
-    last_price: float = None
+    last_price: float = 1.0 # TODO CRIT Need to load in or otherwise set the last_price (its never None IRL)
     min_price: float = None
     max_price: float = None
     n_trades: int = 0

@@ -18,6 +18,9 @@ class OrderMemoryRepository(OrderRepository):
         book = self.store._store._xget("%s" % symbol)
         if book:
             book = [order for order in book.values() if not order.closed and order.side == "BUY"]
+            for b in book:
+                if b.price is None:
+                    b.price = float("inf")
             book = sorted(book, key=lambda order: (-order.price, order.ts, order.txid))
             return book
         return []
@@ -26,6 +29,9 @@ class OrderMemoryRepository(OrderRepository):
         book = self.store._store._xget("%s" % symbol)
         if book:
             book = [order for order in book.values() if not order.closed and order.side == "SELL"]
+            for b in book:
+                if b.price is None:
+                    b.price = float("-inf")
             book = sorted(book, key=lambda order: (order.price, order.ts, order.txid))
             return book
         return []

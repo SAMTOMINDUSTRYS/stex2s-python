@@ -49,10 +49,10 @@ class Exchange:
     def add_broker(self, broker):
         self.brokers[broker.code] = broker
 
-    def update_users(self, buys, sells, executed=False):
+    def update_users(self, buys, sells, executed=False, reference_price=None):
         # Emit buys and sells to brokers
         for broker in self.brokers:
-            self.brokers[broker].update_users(buys, sells, executed=executed)
+            self.brokers[broker].update_users(buys, sells, executed=executed, reference_price=reference_price)
 
     def handle_order(self, msg):
         response = {}
@@ -73,7 +73,11 @@ class Exchange:
 
         # Coerce to float (but use some sort of money class)
         # TODO CRIT https://github.com/SAMTOMINDUSTRYS/stex2s-python/issues/2
-        price = float(msg["price"])
+        if msg["price"] is not None and msg["price"] != '':
+            price = float(msg["price"])
+        else:
+            # Allow market orders with price of None
+            price = None
 
         #TODO CRIT Order vol > 0
         order = Order(
@@ -99,7 +103,7 @@ class Exchange:
         # Good transaction isolation is going to be needed to ensure balance
         # and holdings stay positive in the event of concurrent order handlers
         try:
-            self.brokers[msg["broker_id"]].validate_preorder(user, order)
+            self.brokers[msg["broker_id"]].validate_preorder(user, order, reference_price=self.stalls[order.symbol].last_price)
         except OrderScreeningException as e:
             return {
                 "response_type": "exception",
@@ -115,7 +119,7 @@ class Exchange:
 
         # Process order
         buys, sells = orderbook.add_order(order)
-        self.update_users(buys, sells)
+        self.update_users(buys, sells, reference_price=self.stalls[order.symbol].last_price)
 
         summary = orderbook.summarise_books_for_symbol(symbol)
         log.info("[bold green]BOOK[/] [b]%s[/] %s" % (symbol, str(summary)))
@@ -123,14 +127,15 @@ class Exchange:
         # Repeat trading until no trades are left
         while True:
             # Need to handle the market tick async from messages but this will do for now
+            print(symbol, self.stalls[symbol].last_price)
             proposed_trades = orderbook.match_orderbook(symbol, reference_price=self.stalls[symbol].last_price)
             if len(proposed_trades) == 0:
                 break
 
             for trade in proposed_trades:
                 buys, sells = orderbook.execute_trade(trade) # commit the Trade and close the orders
-                self.update_users(buys, sells, executed=True) # update client holdings and balances
-
+                # update client holdings and balances
+                self.update_users(buys, sells, executed=True, reference_price=self.stalls[order.symbol].last_price)
                 self.stalls[symbol].log_trade(trade)
                 log.info(trade)
 
@@ -257,7 +262,7 @@ class Exchange:
                     ok = False
 
                 if ok:
-                    summary = orderbook.summarise_books_for_symbol(symbol)
+                    summary = orderbook.summarise_books_for_symbol(symbol, reference_price=self.stalls[symbol].last_price)
                     reply = {
                         "response_type": "instrument_orderbook_summary",
                         "response_code": 0,

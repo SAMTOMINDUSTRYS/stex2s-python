@@ -35,7 +35,7 @@ def patched_exchange():
     class BasicBroker:
         def get_user(self, account_id):
             return account_id if account_id in [1, 999] else None
-        def validate_preorder(self, user, order):
+        def validate_preorder(self, user, order, reference_price=None):
             if order.csid == 999:
                 raise Exception("bang")
             elif order.side == "BUY":
@@ -45,7 +45,7 @@ def patched_exchange():
                 raise OrderScreeningException("Insufficient holdings")
 
             return False
-        def update_users(self, buys, sells, executed):
+        def update_users(self, buys, sells, executed, reference_price=None):
             return True
     stex.brokers["MAGENTA"] = BasicBroker()
 
@@ -92,7 +92,7 @@ def test_list_stocks(patched_exchange):
     assert r == sorted(["TEST", "STI."])
 
 
-def test_add_order_ok(patched_exchange):
+def test_add_limit_order_ok(patched_exchange):
     msg = {
         "txid": 1,
         "message_type": "new_order",
@@ -101,6 +101,23 @@ def test_add_order_ok(patched_exchange):
         "side": "BUY",
         "symbol": "STI.",
         "price": "1.01",
+        "volume": 100,
+        "sender_ts": int(time.time()),
+    }
+    r = patched_exchange.recv(msg)
+    assert r["response_type"] == "new_order"
+    assert r["response_code"] == 0
+    assert r["msg"] == "ok"
+
+def test_add_market_order_ok(patched_exchange):
+    msg = {
+        "txid": 1,
+        "message_type": "new_order",
+        "broker_id": "MAGENTA",
+        "account_id": 1,
+        "side": "BUY",
+        "symbol": "STI.",
+        "price": None,
         "volume": 100,
         "sender_ts": int(time.time()),
     }

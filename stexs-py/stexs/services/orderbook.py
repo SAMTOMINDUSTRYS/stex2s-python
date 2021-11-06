@@ -89,7 +89,6 @@ def match_one(buy_book, sell_book, highest_bid=None, lowest_ask=None, reference_
                 # Keep old tests from non t7 suite passing
                 execution_price = None
 
-
             if curr_volume >= buy_volume:
                 # Either volume is just right or there is some excess to split into new Order
                 proposed_trades.append(
@@ -121,6 +120,13 @@ def execute_trade(trade: model.Trade, uow=None):
         # Close all transactions
         # Pass the uow from this scope to join the transactions together
         _close_txids([trade.buy_txid] + trade.sell_txids, uow=uow)
+
+        #TODO CRIT YIKES
+        # Set the Sell value to the executed value
+        for sell_id in trade.sell_txids:
+            sell = uow.orders.get(sell_id)
+            if sell.price == float("-inf"):
+                sell.price = trade.avg_price
 
         # Finally, if Sell volume exceeded requirement, split the final sell into a new Order
         if trade.excess > 0:
@@ -191,7 +197,7 @@ def get_serialised_order_books_for_symbol(symbol, n=None, uow=None):
             "sell_book": [dataclasses_asdict(order) for order in uow.orders.get_sell_book_for_symbol(symbol)[:n]],
         }
 
-def summarise_books_for_symbol(symbol, uow=None):
+def summarise_books_for_symbol(symbol, reference_price=None, uow=None):
     if not uow:
         uow = _default_uow()
 
@@ -210,6 +216,12 @@ def summarise_books_for_symbol(symbol, uow=None):
         except:
             sell = None
 
+        if buy == float("inf"):
+            buy = reference_price
+
+        if sell == float("-inf"):
+            sell = reference_price
+
         return summarise_books(buy_book, sell_book, buy=buy, sell=sell)
 
 def match_orderbook(symbol, uow=None, reference_price=None):
@@ -221,6 +233,6 @@ def match_orderbook(symbol, uow=None, reference_price=None):
     with uow:
         buy_book = uow.orders.get_buy_book_for_symbol(symbol)
         sell_book = uow.orders.get_sell_book_for_symbol(symbol)
-        summary = summarise_books_for_symbol(symbol, uow=uow)
+        summary = summarise_books_for_symbol(symbol, reference_price=reference_price, uow=uow)
         return match_one(buy_book, sell_book, highest_bid=summary["buy"], lowest_ask=summary["sell"], reference_price=reference_price)
 

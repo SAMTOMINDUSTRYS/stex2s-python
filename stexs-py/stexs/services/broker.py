@@ -30,21 +30,31 @@ class Broker:
                 uow.users.add(client)
             uow.commit()
 
-    def validate_preorder(self, user, order):
+    def validate_preorder(self, user, order, reference_price=None):
+        # Replace the order.price with reference_price if the user is submitting a market order
         try:
-            user.screen_order(order.side, order.symbol, order.price, order.volume)
+            order_price = order.price
+            if not order_price:
+                order_price = reference_price
+            user.screen_order(order.side, order.symbol, order_price, order.volume)
         except OrderScreeningException as e:
             raise e
         return True
 
-    def update_users(self, buy_orders, sell_orders, executed=False, uow=None):
+    def update_users(self, buy_orders, sell_orders, executed=False, uow=None, reference_price=None):
         if not uow:
             uow = self.user_uow()
 
         with uow:
             if not executed:
                 for order in buy_orders:
-                    self.adjust_balance(order.csid, order.price * order.volume * -1, uow=uow)
+                    # order.price may be None before execution
+                    # Use the reference_price
+                    order_price = order.price
+                    if not order_price:
+                        order_price = reference_price
+
+                    self.adjust_balance(order.csid, order_price * order.volume * -1, uow=uow)
                 for order in sell_orders:
                     self.adjust_holding(order.csid, order.symbol, order.volume * -1, uow=uow)
             else:
