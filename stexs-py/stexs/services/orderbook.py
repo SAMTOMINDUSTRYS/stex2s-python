@@ -268,5 +268,17 @@ def match_orderbook(symbol, uow=None, reference_price=None):
         buy_book = uow.orders.get_buy_book_for_symbol(symbol)
         sell_book = uow.orders.get_sell_book_for_symbol(symbol)
         summary = summarise_books_for_symbol(symbol, reference_price=reference_price, uow=uow)
-        return match_one(buy_book, sell_book, highest_bid=summary["buy"], lowest_ask=summary["sell"], reference_price=reference_price)
+
+        highest_bid = None
+        for buy in buy_book:
+            if buy.price != float("inf"):
+                highest_bid = buy.price
+                break
+        lowest_ask = None
+        for sell in sell_book:
+            if sell.price != float("-inf"):
+                lowest_ask = sell.price
+                break
+
+        return match_one(buy_book, sell_book, highest_bid=highest_bid, lowest_ask=lowest_ask, reference_price=reference_price)
 
