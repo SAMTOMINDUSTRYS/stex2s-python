@@ -77,14 +77,48 @@ def match_one(buy_book, sell_book, highest_bid=None, lowest_ask=None, reference_
             buy_sells.append(sell)
 
             # Determine price
+            execution_price = None
             if reference_price or (highest_bid and lowest_ask):
                 # TODO What about multiple orders?
                 if buy.ts < sell.ts:
                     # If the sell is newer, it sells at the highest existing buy
-                    execution_price = highest_bid
+                    if highest_bid:
+                        if reference_price and highest_bid < reference_price:
+                            if lowest_ask and highest_bid >= lowest_ask:
+                                if buy_price == float("inf"):
+                                    # EX16
+                                    execution_price = reference_price
+                                else:
+                                    # EX13
+                                    execution_price = highest_bid
+                            else:
+                                # EX4
+                                execution_price = reference_price
+                        else:
+                            if lowest_ask and lowest_ask > reference_price and lowest_ask > highest_bid:
+                                # EX18
+                                execution_price = lowest_ask
+                            else:
+                                execution_price = highest_bid
+                    else:
+                        if lowest_ask and reference_price and reference_price < lowest_ask:
+                            # EX10
+                            execution_price = lowest_ask
+                        else:
+                            execution_price = reference_price
                 else:
                     # If the buy is newer (or equal), it buys at the lowest existing sell
-                    execution_price = lowest_ask
+                    if lowest_ask:
+                        if reference_price and lowest_ask > reference_price:
+                            # EX6
+                            execution_price = reference_price
+                        else:
+                            execution_price = lowest_ask
+                    else:
+                        if highest_bid and reference_price and reference_price > highest_bid:
+                            execution_price = highest_bid
+                        else:
+                            execution_price = reference_price
             else:
                 # Keep old tests from non t7 suite passing
                 execution_price = None
