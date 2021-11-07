@@ -81,7 +81,7 @@ def execute_trade(trade: model.Trade, uow=None):
             confirmed_sells.append(uow.orders.get(sell))
 
     # TODO Join this at the Exchange level to transfer assets in the same transaction
-    return confirmed_buys, confirmed_sells, remainder_sell
+    return confirmed_buys, confirmed_sells
 
 
 def summarise_books(buy_book, sell_book, buy=None, sell=None):

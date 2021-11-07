@@ -26,7 +26,7 @@ class MatcherMemoryRepository(OrderRepository):
 
     def add(self, order):
         self.add_order(order.symbol, order.side, order.price, order.volume, order.ts, order.txid)
-        self.txid_map[order.txid] = order
+        self.txid_map[order.txid] = copy.copy(order)
 
     def get(self, txid):
         return self.txid_map.get(txid)

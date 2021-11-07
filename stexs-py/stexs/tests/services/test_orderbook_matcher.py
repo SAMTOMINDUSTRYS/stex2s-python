@@ -259,7 +259,7 @@ def test_execute_trade():
         order_uow.commit()
 
         trade = _attempt_test_trade(orders, reference_price=1.0)
-        confirmed_buys, confirmed_sells, remainder_sell = wrap_service_execute_trade(trade)
+        confirmed_buys, confirmed_sells = wrap_service_execute_trade(trade)
 
         # Trade is closed
         assert trade.closed == True
@@ -280,7 +280,6 @@ def test_execute_trade():
                 assert remaining_sell.volume == 50
 
     with TEST_UOW() as uow:
-        uow.orders.add(remainder_sell)
         assert uow.orders.get("2/3") is not None
 
 def test_full_split():
@@ -293,12 +292,6 @@ def test_full_split():
         uow.orders.clear()
         trade = _attempt_test_trade(orders, reference_price=1.0, uow=uow)
         _assert_trade(trade, excess=50, buy_id='1', sell_ids=['2'], price=1)
-
-        for order in orders:
-            order_uow.orders.add(order)
-        order_uow.commit()
-        confirmed_buys, confirmed_sells, remainder_sell = wrap_service_execute_trade(trade)
-        uow.orders.add(remainder_sell)
 
         orders = [Order(txid="3", csid="1", side="BUY", symbol="STI.", price=1.0, volume=50, ts=2)]
         trade = _attempt_test_trade(orders, reference_price=1.0, uow=uow)

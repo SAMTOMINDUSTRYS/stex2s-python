@@ -134,9 +134,7 @@ class Exchange:
                 break
 
             for trade in proposed_trades:
-                buys, sells, remainder = orderbook.execute_trade(trade) # commit the Trade and close the orders
-                if remainder:
-                    matcher.add_order(remainder)
+                buys, sells = orderbook.execute_trade(trade) # commit the Trade and close the orders
                 # update client holdings and balances
                 self.update_users(buys, sells, executed=True, reference_price=self.stalls[order.symbol].last_price)
                 self.stalls[symbol].log_trade(trade)

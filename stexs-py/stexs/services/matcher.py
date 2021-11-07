@@ -107,11 +107,17 @@ def match_orderbook(symbol, uow=None):
                         else:
                             execution_price = reference_price
 
+                excess = curr_volume - buy_volume
                 if curr_volume >= buy_volume:
                     # Either volume is just right or there is some excess to split into new Order
                     proposed_trades.append(
-                            propose_trade(buy, buy_sells, excess=curr_volume - buy_volume, execution_price=execution_price)
+                            propose_trade(buy, buy_sells, excess=excess, execution_price=execution_price)
                     )
+
+                    # Split sell
+                    if excess > 0:
+                        sell, remainder_sell = Order.split_sell(uow.orders.get(sell.txid), excess)
+                        uow.orders.add(remainder_sell)
 
                     # Delete the orders from the matcher book
                     for executed_order in [buy.txid] + [sell.txid for sell in buy_sells]:
@@ -122,5 +128,5 @@ def match_orderbook(symbol, uow=None):
 
             if done:
                 break
-
+        uow.commit()
         return proposed_trades
