@@ -42,118 +42,6 @@ def close_txids(txids: List[str], uow=None):
         _close_txids(txids, uow)
         uow.commit()
 
-def match_one(buy_book, sell_book, reference_price=None):
-
-    highest_bid = None
-    lowest_ask = None
-
-    if reference_price:
-        for buy in buy_book:
-            if buy.price != float("inf"):
-                highest_bid = buy.price
-                break
-        for sell in sell_book:
-            if sell.price != float("-inf"):
-                lowest_ask = sell.price
-                break
-
-    done = False
-
-    proposed_trades = []
-
-    for buy in buy_book:
-        if buy.closed:
-            # Abort on closed buy
-            break
-
-        buy_sells = []
-        curr_volume = 0
-
-        buy_price = buy.price
-        buy_volume = buy.volume
-
-        for sell in sell_book:
-            if sell.closed:
-                # Skip sold sell
-                continue
-
-            sell_price = sell.price
-            sell_volume = sell.volume
-
-            if buy_price < sell_price:
-                # Sells are sorted, so if we cannot afford this sell, there won't
-                # be any more sells at the right price range
-                done = True
-                break
-
-            # If the buy match or exceeds the sell price, we can trade
-            curr_volume += sell_volume
-            buy_sells.append(sell)
-
-            # Determine price
-            execution_price = None
-            if reference_price or (highest_bid and lowest_ask):
-                # TODO What about multiple orders?
-                if buy.ts < sell.ts:
-                    # If the sell is newer, it sells at the highest existing buy
-                    if highest_bid:
-                        if reference_price and highest_bid < reference_price:
-                            if lowest_ask and highest_bid >= lowest_ask:
-                                if buy_price == float("inf"):
-                                    # EX16
-                                    execution_price = reference_price
-                                else:
-                                    # EX13
-                                    execution_price = highest_bid
-                            else:
-                                # EX4
-                                execution_price = reference_price
-                        else:
-                            if lowest_ask and lowest_ask > reference_price and lowest_ask > highest_bid:
-                                # EX18
-                                execution_price = lowest_ask
-                            else:
-                                execution_price = highest_bid
-                    else:
-                        if lowest_ask and reference_price and reference_price < lowest_ask:
-                            # EX10
-                            execution_price = lowest_ask
-                        else:
-                            execution_price = reference_price
-                else:
-                    # If the buy is newer (or equal), it buys at the lowest existing sell
-                    if lowest_ask:
-                        if reference_price and lowest_ask > reference_price:
-                            # EX6
-                            execution_price = reference_price
-                        else:
-                            execution_price = lowest_ask
-                    else:
-                        if highest_bid and reference_price and reference_price > highest_bid:
-                            execution_price = highest_bid
-                        else:
-                            execution_price = reference_price
-            else:
-                # Keep old tests from non t7 suite passing
-                execution_price = None
-
-            if curr_volume >= buy_volume:
-                # Either volume is just right or there is some excess to split into new Order
-                proposed_trades.append(
-                        propose_trade(buy, buy_sells, excess=curr_volume - buy_volume, execution_price=execution_price)
-                )
-                done = True # Force update before running match again
-                break # Don't keep trying to add sells to this buy!
-
-        if done:
-            break
-
-    return proposed_trades
-
-
-def propose_trade(buy: Order, sells: List[Order], excess=0, execution_price=None):
-    return model.Trade.propose_trade(buy, sells, excess, execution_price)
-
 
 def split_sell(filled_sell: Order, excess_volume: int):
     filled_sell, remainder_sell = Order.split_sell(filled_sell, excess_volume)
@@ -193,7 +81,7 @@ def execute_trade(trade: model.Trade, uow=None):
             confirmed_sells.append(uow.orders.get(sell))
 
     # TODO Join this at the Exchange level to transfer assets in the same transaction
-    return confirmed_buys, confirmed_sells
+    return confirmed_buys, confirmed_sells, remainder_sell
 
 
 def summarise_books(buy_book, sell_book, buy=None, sell=None):
@@ -271,15 +159,4 @@ def summarise_books_for_symbol(symbol, reference_price=None, uow=None):
             sell = reference_price
 
         return summarise_books(buy_book, sell_book, buy=buy, sell=sell)
-
-def match_orderbook(symbol, uow=None, reference_price=None):
-    if not uow:
-        uow = _default_uow()
-    # Trigger match process
-    #       Will need to think about how this can be thread-safe if we move
-    #       matching/trading to a separate thread from adding orders
-    with uow:
-        buy_book = uow.orders.get_buy_book_for_symbol(symbol)
-        sell_book = uow.orders.get_sell_book_for_symbol(symbol)
-        return match_one(buy_book, sell_book, reference_price=reference_price)
 

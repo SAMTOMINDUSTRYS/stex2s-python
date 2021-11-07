@@ -2,7 +2,7 @@ from stexs.domain import model
 from stexs.domain.order import Order
 from stexs.domain.broker import OrderScreeningException
 from stexs.services.logger import log
-from stexs.services import orderbook
+from stexs.services import orderbook, matcher
 import stexs.io.persistence as iop
 from typing import List, Dict
 import time
@@ -42,6 +42,7 @@ class Exchange:
         for stock in stocks:
             add_stock(stock, uow=self.stock_uow())
             self.stalls[stock.symbol] = model.MarketStall(stock=stock)
+            matcher.add_book(stock.symbol, reference_price=1)
 
     def list_stocks(self):
         return list_stocks(uow=self.stock_uow())
@@ -118,7 +119,8 @@ class Exchange:
             }
 
         # Process order
-        buys, sells = orderbook.add_order(order)
+        buys, sells = orderbook.add_order(order) # Add order to canonical order repo
+        matcher.add_order(order) # Add order to lightweight matching engine
         self.update_users(buys, sells, reference_price=self.stalls[order.symbol].last_price)
 
         summary = orderbook.summarise_books_for_symbol(symbol)
@@ -127,12 +129,14 @@ class Exchange:
         # Repeat trading until no trades are left
         while True:
             # Need to handle the market tick async from messages but this will do for now
-            proposed_trades = orderbook.match_orderbook(symbol, reference_price=self.stalls[symbol].last_price)
+            proposed_trades = matcher.match_orderbook(symbol)
             if len(proposed_trades) == 0:
                 break
 
             for trade in proposed_trades:
-                buys, sells = orderbook.execute_trade(trade) # commit the Trade and close the orders
+                buys, sells, remainder = orderbook.execute_trade(trade) # commit the Trade and close the orders
+                if remainder:
+                    matcher.add_order(remainder)
                 # update client holdings and balances
                 self.update_users(buys, sells, executed=True, reference_price=self.stalls[order.symbol].last_price)
                 self.stalls[symbol].log_trade(trade)

@@ -82,7 +82,8 @@ def test_sellbook_ordered_by_minprice_mintime():
 
     assert sellbook == [orders[2], orders[0], orders[1]]
 
-
+# TODO NOTE CRIT Deprecated by test_orderbook_matcher
+"""
 def test_match_order_with_empty_buy_has_no_trades():
     orders = [
         Order(txid="1", csid="1", side="SELL", symbol="STI.", price=1.0, volume=100, ts=1),
@@ -192,6 +193,7 @@ def test_match_skips_on_closed_sell():
     trades = wrap_service_match_one(buys, sells)
     assert len(trades) == 1
     assert trades[0].sell_txids == ["3"]
+"""
 
 
 """
@@ -228,6 +230,7 @@ def test_split_sell():
     assert not remainder.closed
 
 
+"""
 def test_execute_trade():
     buys = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=1.0, volume=100, ts=1),
@@ -258,7 +261,7 @@ def test_execute_trade():
                 assert remaining_sell is not None
                 assert remaining_sell.txid == "2/3"
                 assert remaining_sell.volume == 50
-
+"""
 
 def test_summarise_empty_books():
     buy_book = []
