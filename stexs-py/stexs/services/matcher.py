@@ -32,6 +32,48 @@ def delete_order(order, uow=None):
 def propose_trade(buy: Order, sells: List[Order], excess=0, execution_price=None):
     return Trade.propose_trade(buy, sells, excess, execution_price)
 
+def get_execution_price(buy_ts, sell_ts, buy_price, sell_price, reference_price, highest_bid, lowest_ask):
+    execution_price = None
+    if buy_ts < sell_ts:
+        if highest_bid:
+            if reference_price and highest_bid < reference_price:
+                if lowest_ask and highest_bid >= lowest_ask:
+                    if buy_price == float("inf"):
+                        # EX16
+                        execution_price = reference_price
+                    else:
+                        # EX13
+                        execution_price = highest_bid
+                else:
+                    # EX4
+                    execution_price = reference_price
+            else:
+                if lowest_ask and lowest_ask > reference_price and lowest_ask > highest_bid:
+                    # EX18
+                    execution_price = lowest_ask
+                else:
+                    execution_price = highest_bid
+        else:
+            if lowest_ask and reference_price and reference_price < lowest_ask:
+                # EX10
+                execution_price = lowest_ask
+            else:
+                execution_price = reference_price
+    else:
+        # If the buy is newer (or equal), it buys at the lowest existing sell
+        if lowest_ask:
+            if reference_price and lowest_ask > reference_price:
+                # EX6
+                execution_price = reference_price
+            else:
+                execution_price = lowest_ask
+        else:
+            if highest_bid and reference_price and reference_price > highest_bid:
+                execution_price = highest_bid
+            else:
+                execution_price = reference_price
+    return execution_price
+
 def match_orderbook(symbol, uow=None):
     if not uow:
         uow = _default_uow()
@@ -67,45 +109,7 @@ def match_orderbook(symbol, uow=None):
                 buy_sells.append(sell)
 
                 # Determine price
-                execution_price = None
-                if buy.ts < sell.ts:
-                    if highest_bid:
-                        if reference_price and highest_bid < reference_price:
-                            if lowest_ask and highest_bid >= lowest_ask:
-                                if buy_price == float("inf"):
-                                    # EX16
-                                    execution_price = reference_price
-                                else:
-                                    # EX13
-                                    execution_price = highest_bid
-                            else:
-                                # EX4
-                                execution_price = reference_price
-                        else:
-                            if lowest_ask and lowest_ask > reference_price and lowest_ask > highest_bid:
-                                # EX18
-                                execution_price = lowest_ask
-                            else:
-                                execution_price = highest_bid
-                    else:
-                        if lowest_ask and reference_price and reference_price < lowest_ask:
-                            # EX10
-                            execution_price = lowest_ask
-                        else:
-                            execution_price = reference_price
-                else:
-                    # If the buy is newer (or equal), it buys at the lowest existing sell
-                    if lowest_ask:
-                        if reference_price and lowest_ask > reference_price:
-                            # EX6
-                            execution_price = reference_price
-                        else:
-                            execution_price = lowest_ask
-                    else:
-                        if highest_bid and reference_price and reference_price > highest_bid:
-                            execution_price = highest_bid
-                        else:
-                            execution_price = reference_price
+                execution_price = get_execution_price(buy.ts, sell.ts, buy_price, sell_price, reference_price, highest_bid, lowest_ask)
 
                 excess = curr_volume - buy_volume
                 if curr_volume >= buy_volume:
