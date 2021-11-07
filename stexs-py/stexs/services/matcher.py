@@ -44,46 +44,38 @@ def get_execution_price(buy_ts, sell_ts, buy_price, sell_price, reference_price,
 
     price = None
 
-    # If we can match without a highest_bid or lowest_ask then these are both
-    # market orders and no other information is available to set a price
     if not highest_bid and not lowest_ask:
         # EX1
+        # If we can match without a highest_bid or lowest_ask then these are both
+        # market orders and no other information is available to set a price
         price = reference_price
 
-    # Market or limit order meeting a market order
     elif book_order_price == float("inf") or book_order_price == float("-inf"):
-        if is_selling:
-            # EX16, EX17, EX18
-            # Mixed market and limit
-            if not highest_bid:
-                # EX9, EX10
-                # Limit meets only market orders so highest_bid unset
-                highest_bid = reference_price
-            elif not lowest_ask:
-                # EX4, EX5
-                # Market order meets market or limit so this side is unset
-                lowest_ask = reference_price
+        # Market or limit order meeting a market order
 
+        if not highest_bid:
+            highest_bid = reference_price
+        if not lowest_ask:
+            lowest_ask = reference_price
+
+        if is_selling:
+            # EX16, EX17, EX18 (Mixed market and limit)
+            # EX9, EX10 (Limit meets only market orders so highest_bid unset)
+            # EX4, EX5 (Market order ask order meets market or limit so lowest_ask unset)
             # Sell at highest price
+            # Market or limit order meets market only, or mixed book
             price = max(reference_price, highest_bid, lowest_ask)
 
         elif is_buying:
-            # EX19, EX20, EX21
-            # Mixed market and limit
-            if not lowest_ask:
-                # EX11, EX12
-                # Limit meets only market orders so lowest_ask unset
-                lowest_ask = reference_price
-            elif not highest_bid:
-                # EX6, EX7
-                # Market order meets market or limit so this side is unset
-                highest_bid = reference_price
-
+            # EX19, EX20, EX21 (Mixed market and limit)
+            # EX11, EX12 (Limit meets only market orders so lowest_ask unset)
+            # EX6, EX7 (Market only bid order meets market or limit so highest_bid unset)
             # Buy at lowest price
+            # Market or limit order meets market only, or mixed book
             price = min(reference_price, highest_bid, lowest_ask)
 
-    # Market or limit order meeting a limit order
     else:
+        # Market or limit order meeting only limit orders
         if is_selling:
             # EX2, EX13
             price = highest_bid
