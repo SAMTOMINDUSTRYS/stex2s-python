@@ -36,7 +36,7 @@ def _assert_trade(trade, excess, buy_id, sell_ids, price):
     assert trade.avg_price == price
 
 # T7 11.2.2.1 1
-def test_market_order_meets_book_with_market_order_on_other_side():
+def test_t7_1_market_order_meets_book_with_market_order_on_other_side():
     orders = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=float("inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="SELL", symbol="STI.", price=float("-inf"), volume=6000, ts=902),
@@ -45,16 +45,16 @@ def test_market_order_meets_book_with_market_order_on_other_side():
     _assert_trade(trade, excess=0, buy_id='1', sell_ids=['2'], price=200.0)
 
 # T7 12.2.2.1 2
-def test_order_meets_book_with_limit_order_on_other_side():
+def test_t7_2_order_meets_book_with_limit_order_on_other_side():
     orders = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=200, volume=6000, ts=901),
-        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=200, volume=6000, ts=902),
+        Order(txid="2", csid="1", side="SELL", symbol="STI.", price=float("-inf"), volume=6000, ts=902),
     ]
     trade = _attempt_test_trade(orders, reference_price=200)
     _assert_trade(trade, excess=0, buy_id='1', sell_ids=['2'], price=200.0)
 
 # T7 12.2.2.1 3
-def test_market_order_meets_order_book_with_limit_order_on_other_side():
+def test_t7_3_market_order_meets_order_book_with_limit_order_on_other_side():
     orders = [
         Order(txid="1", csid="1", side="SELL", symbol="STI.", price=200, volume=6000, ts=901),
         Order(txid="2", csid="1", side="BUY", symbol="STI.", price=float("inf"), volume=6000, ts=902),
@@ -63,7 +63,7 @@ def test_market_order_meets_order_book_with_limit_order_on_other_side():
     _assert_trade(trade, excess=0, buy_id='2', sell_ids=['1'], price=200.0)
 
 # T7 12.2.2.1 4
-def test_market_order_meets_order_book_with_market_and_limit_order_on_buy_side_under_ref():
+def test_t7_4_market_order_meets_order_book_with_market_and_limit_order_on_buy_side_under_ref():
     orders = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=float("inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="BUY", symbol="STI.", price=195, volume=1000, ts=902),
@@ -74,7 +74,7 @@ def test_market_order_meets_order_book_with_market_and_limit_order_on_buy_side_u
     _assert_trade(trade, excess=0, buy_id='1', sell_ids=['3'], price=200.0)
 
 # T7 12.2.2.1 5
-def test_market_order_meets_order_book_with_market_and_limit_order_on_buy_side_over_ref():
+def test_t7_5_market_order_meets_order_book_with_market_and_limit_order_on_buy_side_over_ref():
     orders = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=float("inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="BUY", symbol="STI.", price=202, volume=1000, ts=902),
@@ -84,7 +84,7 @@ def test_market_order_meets_order_book_with_market_and_limit_order_on_buy_side_o
     _assert_trade(trade, excess=0, buy_id='1', sell_ids=['3'], price=202.0)
 
 # T7 12.2.2.1 6
-def test_market_order_meets_order_book_with_market_and_limit_order_on_sell_side_under_ref():
+def test_t7_6_market_order_meets_order_book_with_market_and_limit_order_on_sell_side_under_ref():
     orders = [
         Order(txid="1", csid="1", side="SELL", symbol="STI.", price=float("-inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="SELL", symbol="STI.", price=202, volume=1000, ts=902),
@@ -94,7 +94,7 @@ def test_market_order_meets_order_book_with_market_and_limit_order_on_sell_side_
     _assert_trade(trade, excess=0, buy_id='3', sell_ids=['1'], price=200.0)
 
 # T7 12.2.2.1 7
-def test_market_order_meets_order_book_with_market_and_limit_order_on_sell_side_over_ref():
+def test_t7_7_market_order_meets_order_book_with_market_and_limit_order_on_sell_side_over_ref():
     orders = [
         Order(txid="1", csid="1", side="SELL", symbol="STI.", price=float("-inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="SELL", symbol="STI.", price=202, volume=1000, ts=902),
@@ -104,14 +104,14 @@ def test_market_order_meets_order_book_with_market_and_limit_order_on_sell_side_
     _assert_trade(trade, excess=0, buy_id='3', sell_ids=['1'], price=202.0)
 
 # T7 12.2.2.1 8
-def test_market_order_meets_empty_order_book():
+def test_t7_8_market_order_meets_empty_order_book():
     orders = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=float("inf"), volume=6000, ts=1001),
     ]
     trade = _attempt_test_trade(orders, reference_price=202, expected_trades=0)
 
 # T7 12.2.2.1 9
-def test_limit_order_meets_order_book_with_market_order_on_other_side_ask_under_ref():
+def test_t7_9_limit_order_meets_order_book_with_market_order_on_other_side_ask_under_ref():
     orders = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=float("inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="SELL", symbol="STI.", price=195, volume=6000, ts=902),
@@ -120,7 +120,7 @@ def test_limit_order_meets_order_book_with_market_order_on_other_side_ask_under_
     _assert_trade(trade, excess=0, buy_id='1', sell_ids=['2'], price=200)
 
 # T7 12.2.2.1 10
-def test_limit_order_meets_order_book_with_market_order_on_other_side_ask_over_ref():
+def test_t7_10_limit_order_meets_order_book_with_market_order_on_other_side_ask_over_ref():
     orders = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=float("inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="SELL", symbol="STI.", price=203, volume=6000, ts=902),
@@ -129,7 +129,7 @@ def test_limit_order_meets_order_book_with_market_order_on_other_side_ask_over_r
     _assert_trade(trade, excess=0, buy_id='1', sell_ids=['2'], price=203)
 
 # T7 12.2.2.1 11
-def test_limit_order_meets_order_book_with_market_order_on_other_side_bid_over_ref():
+def test_t7_11_limit_order_meets_order_book_with_market_order_on_other_side_bid_over_ref():
     orders = [
         Order(txid="1", csid="1", side="SELL", symbol="STI.", price=float("-inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="BUY", symbol="STI.", price=203, volume=6000, ts=902),
@@ -138,7 +138,7 @@ def test_limit_order_meets_order_book_with_market_order_on_other_side_bid_over_r
     _assert_trade(trade, excess=0, buy_id='2', sell_ids=['1'], price=200)
 
 # T7 12.2.2.1 12
-def test_limit_order_meets_order_book_with_market_order_on_other_side_bid_under_ref():
+def test_t7_12_limit_order_meets_order_book_with_market_order_on_other_side_bid_under_ref():
     orders = [
         Order(txid="1", csid="1", side="SELL", symbol="STI.", price=float("-inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="BUY", symbol="STI.", price=199, volume=6000, ts=902),
@@ -173,7 +173,7 @@ def test_t7_15_book_best_bid_under_lowest_ask():
     trade = _attempt_test_trade(orders, reference_price=200, expected_trades=0)
 
 # T7 12.2.2.1 16
-def test_book_market_bid_matched_to_ask_under_ref():
+def test_t7_16_book_market_bid_matched_to_ask_under_ref():
     orders = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=float("inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="BUY", symbol="STI.", price=196, volume=1000, ts=902),
@@ -183,7 +183,7 @@ def test_book_market_bid_matched_to_ask_under_ref():
     _assert_trade(trade, excess=0, buy_id='1', sell_ids=['3'], price=200)
 
 # T7 12.2.2.1 17
-def test_book_market_bid_matched_to_ask_under_ref_at_highest_nonmarket_bid():
+def test_t7_17_book_market_bid_matched_to_ask_under_ref_at_highest_nonmarket_bid():
     orders = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=float("inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="BUY", symbol="STI.", price=202, volume=1000, ts=902),
@@ -193,7 +193,7 @@ def test_book_market_bid_matched_to_ask_under_ref_at_highest_nonmarket_bid():
     _assert_trade(trade, excess=0, buy_id='1', sell_ids=['3'], price=202)
 
 # T7 12.2.2.1 18
-def test_book_market_bid_matched_to_ask_over_ref_at_highest_nonmarket_bid():
+def test_t7_18_book_market_bid_matched_to_ask_over_ref_at_highest_nonmarket_bid():
     orders = [
         Order(txid="1", csid="1", side="BUY", symbol="STI.", price=float("inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="BUY", symbol="STI.", price=202, volume=1000, ts=902),
@@ -203,7 +203,7 @@ def test_book_market_bid_matched_to_ask_over_ref_at_highest_nonmarket_bid():
     _assert_trade(trade, excess=0, buy_id='1', sell_ids=['3'], price=203)
 
 # T7 12.2.2.1 19
-def test_bid_limit_meets_market_and_limit_ask_exec_highest_bid():
+def test_t7_19_bid_limit_meets_market_and_limit_ask_exec_highest_bid():
     orders = [
         Order(txid="1", csid="1", side="SELL", symbol="STI.", price=float("-inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="SELL", symbol="STI.", price=202, volume=1000, ts=902),
@@ -213,17 +213,17 @@ def test_bid_limit_meets_market_and_limit_ask_exec_highest_bid():
     _assert_trade(trade, excess=0, buy_id='3', sell_ids=['1'], price=200)
 
 # T7 12.2.2.1 20
-def test_bid_limit_meets_market_and_limit_ask_exec_reference():
+def test_t7_20_bid_limit_meets_market_and_limit_ask_exec_reference():
     orders = [
         Order(txid="1", csid="1", side="SELL", symbol="STI.", price=float("-inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="SELL", symbol="STI.", price=202, volume=1000, ts=902),
         Order(txid="3", csid="1", side="BUY", symbol="STI.", price=200, volume=6000, ts=903),
     ]
-    trade = _attempt_test_trade(orders, reference_price=200)
+    trade = _attempt_test_trade(orders, reference_price=201)
     _assert_trade(trade, excess=0, buy_id='3', sell_ids=['1'], price=200)
 
 # T7 12.2.2.1 21
-def test_bid_limit_meets_market_and_limit_ask_exec_lowest_ask():
+def test_t7_21_bid_limit_meets_market_and_limit_ask_exec_lowest_ask():
     orders = [
         Order(txid="1", csid="1", side="SELL", symbol="STI.", price=float("-inf"), volume=6000, ts=901),
         Order(txid="2", csid="1", side="SELL", symbol="STI.", price=199, volume=1000, ts=902),

@@ -33,46 +33,66 @@ def propose_trade(buy: Order, sells: List[Order], excess=0, execution_price=None
     return Trade.propose_trade(buy, sells, excess, execution_price)
 
 def get_execution_price(buy_ts, sell_ts, buy_price, sell_price, reference_price, highest_bid, lowest_ask):
-    execution_price = None
-    if buy_ts < sell_ts:
-        if highest_bid:
-            if reference_price and highest_bid < reference_price:
-                if lowest_ask and highest_bid >= lowest_ask:
-                    if buy_price == float("inf"):
-                        # EX16
-                        execution_price = reference_price
-                    else:
-                        # EX13
-                        execution_price = highest_bid
-                else:
-                    # EX4
-                    execution_price = reference_price
-            else:
-                if lowest_ask and lowest_ask > reference_price and lowest_ask > highest_bid:
-                    # EX18
-                    execution_price = lowest_ask
-                else:
-                    execution_price = highest_bid
-        else:
-            if lowest_ask and reference_price and reference_price < lowest_ask:
-                # EX10
-                execution_price = lowest_ask
-            else:
-                execution_price = reference_price
+    if buy_ts > sell_ts:
+        is_buying = True
+        is_selling = False
+        incoming_order_price, book_order_price = buy_price, sell_price
     else:
-        # If the buy is newer (or equal), it buys at the lowest existing sell
-        if lowest_ask:
-            if reference_price and lowest_ask > reference_price:
-                # EX6
-                execution_price = reference_price
-            else:
-                execution_price = lowest_ask
-        else:
-            if highest_bid and reference_price and reference_price > highest_bid:
-                execution_price = highest_bid
-            else:
-                execution_price = reference_price
-    return execution_price
+        is_buying = False
+        is_selling = True
+        incoming_order_price, book_order_price = sell_price, buy_price
+
+    price = None
+
+    # If we can match without a highest_bid or lowest_ask then these are both
+    # market orders and no other information is available to set a price
+    if not highest_bid and not lowest_ask:
+        # EX1
+        price = reference_price
+
+    # Market or limit order meeting a market order
+    elif book_order_price == float("inf") or book_order_price == float("-inf"):
+        if is_selling:
+            # EX16, EX17, EX18
+            # Mixed market and limit
+            if not highest_bid:
+                # EX9, EX10
+                # Limit meets only market orders so highest_bid unset
+                highest_bid = reference_price
+            elif not lowest_ask:
+                # EX4, EX5
+                # Market order meets market or limit so this side is unset
+                lowest_ask = reference_price
+
+            # Sell at highest price
+            price = max(reference_price, highest_bid, lowest_ask)
+
+        elif is_buying:
+            # EX19, EX20, EX21
+            # Mixed market and limit
+            if not lowest_ask:
+                # EX11, EX12
+                # Limit meets only market orders so lowest_ask unset
+                lowest_ask = reference_price
+            elif not highest_bid:
+                # EX6, EX7
+                # Market order meets market or limit so this side is unset
+                highest_bid = reference_price
+
+            # Buy at lowest price
+            price = min(reference_price, highest_bid, lowest_ask)
+
+    # Market or limit order meeting a limit order
+    else:
+        if is_selling:
+            # EX2, EX13
+            price = highest_bid
+        elif is_buying:
+            # EX3, EX14
+            price = lowest_ask
+
+    return price
+
 
 def match_orderbook(symbol, uow=None):
     if not uow:
