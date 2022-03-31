@@ -42,9 +42,12 @@ if __name__ == "__main__":
                     if not data:
                         break
 
-                    payload = json.loads( data.decode("ascii") )
-                    reply = stex.recv(payload)
+                    try:
+                        payload = json.loads( data.decode("ascii") )
+                        reply = stex.recv(payload)
 
-                    payload = json.dumps(reply).encode("ascii")
-                    conn.send(payload)
+                        payload = json.dumps(reply).encode("ascii")
+                        conn.send(payload)
+                    except:
+                        pass # lol
 
