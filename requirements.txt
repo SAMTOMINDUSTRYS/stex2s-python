@@ -1,2 +1,4 @@
 sqlalchemy
 rich
+pyserial
+pynput
