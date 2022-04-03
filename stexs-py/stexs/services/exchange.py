@@ -86,7 +86,7 @@ class Exchange:
             csid=msg["account_id"],
             side=msg["side"],
             symbol=msg["symbol"],
-            price=price,
+            price=price if price != float("inf") and price != float("-inf") else None,
             volume=msg["volume"],
             ts=int(time.time()),
         )
@@ -106,12 +106,14 @@ class Exchange:
         try:
             self.brokers[msg["broker_id"]].validate_preorder(user, order, reference_price=self.stalls[order.symbol].last_price)
         except OrderScreeningException as e:
+            log.debug(e)
             return {
                 "response_type": "exception",
                 "response_code": 77,
                 "msg": str(e),
             }
         except Exception as e:
+            log.debug(e)
             return {
                 "response_type": "exception",
                 "response_code": 70,
