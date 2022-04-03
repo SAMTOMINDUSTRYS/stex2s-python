@@ -159,6 +159,9 @@ class MatcherMemoryRepository(OrderRepository):
         self.orderbooks[order.symbol].purge_order(order.side, txid)
         return order
 
+    def update_reference_price(self, symbol, reference_price):
+        self.orderbooks[symbol].reference_price = reference_price
+
 
 
 class OrderMemoryRepository(OrderRepository):

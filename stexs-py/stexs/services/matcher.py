@@ -22,6 +22,13 @@ def add_order(order, uow=None):
         uow.orders.add(order)
         uow.commit()
 
+def update_reference_price(symbol, reference_price, uow=None):
+    if not uow:
+        uow = _default_uow()
+    with uow:
+        uow.orders.update_reference_price(symbol, reference_price)
+        uow.commit()
+
 def delete_order(order, uow=None):
     if not uow:
         uow = _default_uow()
@@ -31,8 +38,6 @@ def delete_order(order, uow=None):
 
 def propose_trade(buy: Order, sells: List[Order], excess=0, execution_price=None):
     return Trade.propose_trade(buy, sells, excess, execution_price)
-
-
 
 def match_orderbook(symbol, uow=None):
     if not uow:
@@ -83,6 +88,9 @@ def match_orderbook(symbol, uow=None):
                     # Delete the orders from the matcher book
                     for executed_order in [buy.txid] + [sell.txid for sell in buy_sells]:
                         delete_order(executed_order, uow=uow)
+
+                    # Update reference price
+                    update_reference_price(symbol, execution_price, uow=uow)
 
                     done = True # Force update before running match again
                     break # Don't keep trying to add sells to this buy!
