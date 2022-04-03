@@ -260,7 +260,7 @@ if __name__ == "__main__":
 
     with Live(layout, refresh_per_second=25, screen=True) as l:
         txid = 1
-
+        random_client_id = str(uuid.uuid4())[:4]
         while True:
             layout["status"].update(make_status())
             auto_order = True
@@ -318,7 +318,7 @@ if __name__ == "__main__":
                     msg = {
                         "message_type": "new_order",
                         "type": "order",
-                        "txid": "%d" % txid,
+                        "txid": "%s-%d" % (random_client_id, txid),
                         "broker_id": "MAGENTA",
                         "account_id": "1",
                         "side": random.choice(["BUY", "SELL"]),

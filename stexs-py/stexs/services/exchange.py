@@ -82,7 +82,7 @@ class Exchange:
 
         #TODO CRIT Order vol > 0
         order = Order(
-            txid=msg["txid"],
+            txid=msg["txid"], # TODO need a customer side and exchange side tx
             csid=msg["account_id"],
             side=msg["side"],
             symbol=msg["symbol"],
