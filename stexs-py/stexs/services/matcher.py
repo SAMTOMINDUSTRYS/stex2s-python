@@ -39,22 +39,19 @@ def match_orderbook(symbol, uow=None):
         uow = _default_uow()
     with uow:
         book = uow.orders.get_book(symbol)
-        highest_bid = book["highest_bid"]
-        lowest_ask = book["lowest_ask"]
-        reference_price = book["reference_price"]
 
         done = False
 
         proposed_trades = []
 
-        for buy in book["BUY"]["book"]:
+        for buy in book.buy_book:
             buy_sells = []
             curr_volume = 0
 
             buy_price = buy.price
             buy_volume = buy.volume
 
-            for sell in book["SELL"]["book"]:
+            for sell in book.sell_book:
                 sell_price = sell.price
                 sell_volume = sell.volume
 
@@ -69,7 +66,7 @@ def match_orderbook(symbol, uow=None):
                 buy_sells.append(sell)
 
                 # Determine price
-                execution_price = Trade.get_execution_price(buy.ts, sell.ts, buy_price, sell_price, reference_price, highest_bid, lowest_ask)
+                execution_price = Trade.get_execution_price(buy.ts, sell.ts, buy_price, sell_price, book.reference_price, book.highest_bid, book.lowest_ask)
 
                 excess = curr_volume - buy_volume
                 if curr_volume >= buy_volume:

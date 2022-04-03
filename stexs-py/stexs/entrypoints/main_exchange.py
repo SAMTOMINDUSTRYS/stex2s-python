@@ -48,6 +48,7 @@ if __name__ == "__main__":
 
                         payload = json.dumps(reply).encode("ascii")
                         conn.send(payload)
-                    except:
+                    except Exception as e:
+                        log.debug(e)
                         pass # lol
 
